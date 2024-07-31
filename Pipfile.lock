@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "d89d98f03a585e9119652fb6194938b6be16d2d4fb4b4a5ea51c587934d959d0"
+            "sha256": "f1c91960b4d4da3a2732b8221a9423839979cec9ef8664b5dbb7b2a2e5086fc1"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -23,6 +23,13 @@
             ],
             "markers": "python_version >= '3.8'",
             "version": "==1.13.2"
+        },
+        "aniso8601": {
+            "hashes": [
+                "sha256:1d2b7ef82963909e93c4f24ce48d4de9e66009a21bf1c1e1c85bdd0812fe412f",
+                "sha256:72e3117667eedf66951bb2d93f4296a56b94b078a8a95905a052611fb3f1b973"
+            ],
+            "version": "==9.0.1"
         },
         "blinker": {
             "hashes": [
@@ -54,6 +61,7 @@
                 "sha256:34e815dfaa43340d1d15a5c3a02b8476004037eb4840b34910c6e21679d288f3",
                 "sha256:ceb27b0af3823ea2737928a4d99d125a06175b8512c445cbd9a9ce200ef76842"
             ],
+            "index": "pypi",
             "markers": "python_version >= '3.8'",
             "version": "==3.0.3"
         },
@@ -65,6 +73,14 @@
             "index": "pypi",
             "markers": "python_version >= '3.6'",
             "version": "==4.0.7"
+        },
+        "flask-restful": {
+            "hashes": [
+                "sha256:1cf93c535172f112e080b0d4503a8d15f93a48c88bdd36dd87269bdaf405051b",
+                "sha256:fe4af2ef0027df8f9b4f797aba20c5566801b6ade995ac63b588abf1a59cec37"
+            ],
+            "index": "pypi",
+            "version": "==0.3.10"
         },
         "flask-sqlalchemy": {
             "hashes": [
@@ -139,12 +155,21 @@
             "markers": "python_version < '3.13' and platform_machine == 'aarch64' or (platform_machine == 'ppc64le' or (platform_machine == 'x86_64' or (platform_machine == 'amd64' or (platform_machine == 'AMD64' or (platform_machine == 'win32' or platform_machine == 'WIN32')))))",
             "version": "==3.0.3"
         },
+        "gunicorn": {
+            "hashes": [
+                "sha256:350679f91b24062c86e386e198a15438d53a7a8207235a78ba1b53df4c4378d9",
+                "sha256:4a0b436239ff76fb33f11c07a16482c521a7e09c1ce3cc293c2330afe01bec63"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.7'",
+            "version": "==22.0.0"
+        },
         "importlib-metadata": {
             "hashes": [
                 "sha256:11901fa0c2f97919b288679932bb64febaeacf289d18ac84dd68cb2e74213369",
                 "sha256:72e8d4399996132204f9a16dcc751af254a48f8d1b20b9ff0f98d4a8f901e73d"
             ],
-            "markers": "python_version < '3.9'",
+            "markers": "python_version < '3.10'",
             "version": "==8.2.0"
         },
         "importlib-resources": {
@@ -245,6 +270,14 @@
             "markers": "python_version >= '3.7'",
             "version": "==2.1.5"
         },
+        "packaging": {
+            "hashes": [
+                "sha256:026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002",
+                "sha256:5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
+            ],
+            "markers": "python_version >= '3.8'",
+            "version": "==24.1"
+        },
         "psycopg2-binary": {
             "hashes": [
                 "sha256:03ef7df18daf2c4c07e2695e8cfd5ee7f748a1d54d802330985a78d2a5a6dca9",
@@ -331,6 +364,13 @@
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==2.9.0.post0"
+        },
+        "pytz": {
+            "hashes": [
+                "sha256:2a29735ea9c18baf14b448846bde5a48030ed267578472d8955cd0e7443a9812",
+                "sha256:328171f4e3623139da4983451950b28e95ac706e13f3f2630a879749e7a8b319"
+            ],
+            "version": "==2024.1"
         },
         "six": {
             "hashes": [
