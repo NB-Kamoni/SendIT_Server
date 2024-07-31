@@ -29,7 +29,7 @@ class Client(db.Model, SerializerMixin):
     sent_parcels = db.relationship('Parcel', foreign_keys='Parcel.SenderID', backref='sender', lazy=True)
     received_parcels = db.relationship('Parcel', foreign_keys='Parcel.RecipientID', backref='recipient', lazy=True)
 
-    serialize_rules = ('-sent_parcels', '-received_parcels')  # Exclude parcels relationships during serialization
+    serialize_rules = ('-sent_parcels', '-received_parcels')  
 
     def __repr__(self):
         return (f'<Client(ClientID={self.ClientID}, Email={self.Email}, '
@@ -49,7 +49,7 @@ class Admin(db.Model, SerializerMixin):
     # Relationships
     allocations = db.relationship('AdminDeliveryGuyAllocation', backref='admin', lazy=True)
 
-    serialize_rules = ('-allocations',)  # Exclude allocations relationship during serialization
+    serialize_rules = ('-allocations',)  
 
     def __repr__(self):
         return (f'<Admin(AdminID={self.AdminID}, FirstName={self.FirstName}, '
@@ -68,7 +68,7 @@ class ParcelStatus(db.Model, SerializerMixin):
     # Relationships
     parcels = db.relationship('Parcel', backref='status', lazy=True)
 
-    serialize_rules = ('-parcels',)  # Exclude parcels relationship during serialization
+    serialize_rules = ('-parcels',)  
 
     def __repr__(self):
         return f'<ParcelStatus(Name={self.Name})>'
