@@ -13,6 +13,7 @@ psycopg2-binary = "*"
 flask = "*"
 gunicorn = "*"
 flask-restful = "*"
+python-dotenv = "*"
 
 [dev-packages]
 

@@ -21,7 +21,12 @@ else:
 
 # Configure SQLAlchemy database URI based on environment variables
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+
+# Set up database URI based on environment (use DB_EXTERNAL_URL by default)
+if os.getenv('FLASK_ENV') == 'production':
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_INTERNAL_URL")
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_EXTERNAL_URL")
 
 # Set the Flask app secret key from environment variable
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
@@ -30,9 +35,9 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 db.init_app(app)
 
 # Create the app context
-with app.app_context():
-    # Create the database tables if they don't exist
-    db.create_all()
+# with app.app_context():
+#     # Create the database tables if they don't exist
+#     # db.create_all()
 
 # Set up Flask-Restful API
 api = Api(app)

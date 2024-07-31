@@ -108,8 +108,9 @@ class Parcel(db.Model, SerializerMixin):
     RecipientID = db.Column(db.Integer, db.ForeignKey('client.ClientID'))
     StatusID = db.Column(db.Integer, db.ForeignKey('parcel_status.StatusID'))
     DeliveryGuyID = db.Column(db.Integer, db.ForeignKey('delivery_guy.DeliveryGuyID'))
+    DeliveryStatusID = db.Column(db.Integer, db.ForeignKey('delivery_status.DeliveryStatusID'))  # New foreign key
 
-    serialize_rules = ('-sender', '-recipient', '-status', '-delivery_guy')  
+    serialize_rules = ('-sender', '-recipient', '-status', '-delivery_guy', '-delivery_status')  
 
     def __repr__(self):
         return (f'<Parcel(ParcelID={self.ParcelID}, Weight={self.Weight}, '
@@ -130,3 +131,30 @@ class AdminDeliveryGuyAllocation(db.Model, SerializerMixin):
     def __repr__(self):
         return (f'<AdminDeliveryGuyAllocation(AllocationID={self.AllocationID}, '
                 f'AdminID={self.AdminID}, DeliveryGuyID={self.DeliveryGuyID})>')
+
+class User(db.Model, SerializerMixin):
+    __tablename__ = 'user'
+    
+    UserID = db.Column(db.Integer, primary_key=True)
+    Username = db.Column(db.String, index=True, unique=True)
+    PasswordHash = db.Column(db.String)
+    Email = db.Column(db.String, index=True, unique=True)
+    CreatedAt = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<User(UserID={self.UserID}, Username={self.Username}, Email={self.Email})>'
+
+class DeliveryStatus(db.Model, SerializerMixin):
+    __tablename__ = 'delivery_status'
+    
+    DeliveryStatusID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String, unique=True)
+    Description = db.Column(db.String)
+
+    # Relationships
+    parcels = db.relationship('Parcel', backref='delivery_status', lazy=True)
+
+    serialize_rules = ('-parcels',)  
+
+    def __repr__(self):
+        return f'<DeliveryStatus(Name={self.Name})>'
