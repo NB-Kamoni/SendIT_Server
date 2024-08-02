@@ -1,11 +1,12 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, request
+from models import db, Admin
+from flask import Flask, request, make_response, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api, Resource
 from flask_migrate import Migrate  
 from werkzeug.exceptions import NotFound 
-from models import db,Admin
+
 
 # Load environment variables
 load_dotenv()
@@ -64,6 +65,61 @@ def handle_not_found(e):
     return response
 
 app.register_error_handler(404, handle_not_found)
+
+# Added routes to admin
+class Admins(Resource):
+    def get(self):
+        admins_dict_list = [admin.to_dict() for admin in Admin.query.all()]
+        response = make_response(admins_dict_list,200)
+        return response
+    
+    def post(self):
+        new_admin = Admin(
+            first_name = request.get_json()["first_name"],
+            last_name = request.get_json()["last_name"],
+            city = request.get_json()["city"],
+            state = request.get_json()["state"],
+            branch_code = request.get_json()["branch_code"],
+            profile_pic = request.get_json()["profile_pic"],
+        )
+        db.session.add(new_admin)
+        db.session.commit()
+
+        res_dict = new_admin.to_dict()
+        response = make_response(res_dict,201)
+        return response
+    
+api.add_resource(Admins, '/admins')
+
+class AdminById(Resource):
+    def get(self, id):
+        admin = Admin.query.filter_by(admin_id=id).first()
+        admin_dict =admin.to_dict()
+        return make_response(jsonify(admin_dict), 200)
+    
+    def patch(self, id):
+        admin = Admin.query.filter(Admin.admin_id == id).first()
+        json_data = request.get_json()
+        for attr ,value in json_data.items():
+            setattr(admin,attr,value)
+        db.session.add(admin)
+        db.session.commit()
+
+        res_dict = admin.to_dict()
+        response = make_response(res_dict, 200)
+        return response
+    
+    def delete(self, id):
+        admin = Admin.query.filter(Admin.admin_id == id).first()
+        db.session.delete(admin)
+        db.session.commit()
+        res_dict = {"message":"admin deleted successfully"}
+        response = make_response(res_dict,200)
+        return response
+    
+api.add_resource(AdminById, '/admins/<int:id>')
+
+
 
 # Main entry point for the application
 if __name__ == '__main__':
