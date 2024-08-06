@@ -18,7 +18,7 @@ class Admin(db.Model, SerializerMixin):
     first_name = db.Column(db.String)
     last_name = db.Column(db.String)
     city = db.Column(db.String)
-    state = db.column(db.String)
+    state = db.Column(db.String)
     branch_code = db.Column(db.String(100))
     profile_pic = db.Column(db.String, nullable=True)  
 
