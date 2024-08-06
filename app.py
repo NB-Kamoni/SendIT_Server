@@ -1,11 +1,11 @@
 import os
 from dotenv import load_dotenv
-from models import db, Admin
-from flask import Flask, request, make_response, jsonify, render_template
+from flask import Flask, request, make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api, Resource
-from flask_migrate import Migrate  
-from werkzeug.exceptions import NotFound 
+from flask_migrate import Migrate
+from werkzeug.exceptions import NotFound
+from flask_cors import CORS
 
 
 # Load environment variables
@@ -14,7 +14,7 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
-# Load appropriate configuration based on FLASK_ENV
+# Load configuration
 if os.getenv('FLASK_ENV') == 'production':
     app.config.from_object('config.ProductionConfig')
 elif os.getenv('FLASK_ENV') == 'testing':
@@ -22,105 +22,217 @@ elif os.getenv('FLASK_ENV') == 'testing':
 else:
     app.config.from_object('config.DevelopmentConfig')
 
-# Configure SQLAlchemy database URI based on environment variables
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-# Set up database URI based on environment (use DB_EXTERNAL_URL by default)
-if os.getenv('FLASK_ENV') == 'production':
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_INTERNAL_URL")
-else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_EXTERNAL_URL")
-
-# Set the Flask app secret key from environment variable
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_EXTERNAL_URL")
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config['DEBUG'] = os.getenv('DEBUG', 'False') == 'True'
 
-# Initialize SQLAlchemy with the Flask app
+# Initialize SQLAlchemy and Migrate
+db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-db.init_app(app)
 
-# with app.app_context():
-#     # from app.models import *
-#     db.create_all()
-
-# Create the app context
-# with app.app_context():
-#     # Create the database tables if they don't exist
-#     db.create_all()
+# Initialize Flask-CORS
+CORS(app)
 
 # Set up Flask-Restful API
 api = Api(app)
 
-# ---------------------Define resource endpoints---------------------------------------------
-# -------------------------USER RESOURCES-------------------------------------------------
+# Models
+class Admin(db.Model):
+    __tablename__ = 'admins'
+    admin_id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String)
+    last_name = db.Column(db.String)
+    city = db.Column(db.String)
+    state = db.Column(db.String)
+    branch_code = db.Column(db.String(100))
+    profile_pic = db.Column(db.String, nullable=True)
 
-#Bianca
-# Error handling
-@app.errorhandler(NotFound)
-def handle_not_found(e):
-    response = make_response(
-        jsonify({'error':'Not Found','message': 'The requested resource does not exist.'}),
-        404
-    )
-    response.headers['Content-Type'] = 'application/json'
-    return response
+    def to_dict(self):
+        return {
+            'admin_id': self.admin_id,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'city': self.city,
+            'state': self.state,
+            'branch_code': self.branch_code,
+            'profile_pic': self.profile_pic
+        }
 
-app.register_error_handler(404, handle_not_found)
+class DeliveryGuy(db.Model):
+    __tablename__ = 'delivery_guys'
+    delivery_guy_id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String, nullable=False)
+    second_name = db.Column(db.String, nullable=False)
+    address = db.Column(db.String, nullable=False)
+    city = db.Column(db.String, nullable=False)
+    state = db.Column(db.String, nullable=False)
+    phone_number = db.Column(db.String(15), nullable=False)
+    mode = db.Column(db.String, nullable=False)
+    live_location = db.Column(db.String, nullable=True)
+    profile_picture = db.Column(db.String, nullable=True)
 
-# Added routes to admin
+    def to_dict(self):
+        return {
+            'delivery_guy_id': self.delivery_guy_id,
+            'first_name': self.first_name,
+            'second_name': self.second_name,
+            'address': self.address,
+            'city': self.city,
+            'state': self.state,
+            'phone_number': self.phone_number,
+            'mode': self.mode,
+            'live_location': self.live_location,
+            'profile_picture': self.profile_picture
+        }
+
+class Courier(db.Model):
+    __tablename__ = 'couriers'
+    courier_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    address = db.Column(db.String(120), nullable=False)
+    city = db.Column(db.String(50), nullable=False)
+    state = db.Column(db.String(50), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+
+    def to_dict(self):
+        return {
+            'courier_id': self.courier_id,
+            'name': self.name,
+            'address': self.address,
+            'city': self.city,
+            'state': self.state,
+            'phone_number': self.phone_number,
+            'email': self.email,
+        }
+
+# Resources
 class Admins(Resource):
     def get(self):
         admins_dict_list = [admin.to_dict() for admin in Admin.query.all()]
-        response = make_response(admins_dict_list,200)
-        return response
+        return make_response(admins_dict_list, 200)
     
     def post(self):
+        data = request.get_json()
         new_admin = Admin(
-            first_name = request.get_json()["first_name"],
-            last_name = request.get_json()["last_name"],
-            city = request.get_json()["city"],
-            state = request.get_json()["state"],
-            branch_code = request.get_json()["branch_code"],
-            profile_pic = request.get_json()["profile_pic"],
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            city=data["city"],
+            state=data["state"],
+            branch_code=data["branch_code"],
+            profile_pic=data.get("profile_pic")
         )
         db.session.add(new_admin)
         db.session.commit()
-
-        res_dict = new_admin.to_dict()
-        response = make_response(res_dict,201)
-        return response
-    
-api.add_resource(Admins, '/admins')
+        return make_response(new_admin.to_dict(), 201)
 
 class AdminById(Resource):
     def get(self, id):
-        admin = Admin.query.filter_by(admin_id=id).first()
-        admin_dict =admin.to_dict()
-        return make_response(jsonify(admin_dict), 200)
+        admin = Admin.query.get_or_404(id)
+        return make_response(admin.to_dict(), 200)
     
     def patch(self, id):
-        admin = Admin.query.filter(Admin.admin_id == id).first()
-        json_data = request.get_json()
-        for attr ,value in json_data.items():
-            setattr(admin,attr,value)
-        db.session.add(admin)
+        admin = Admin.query.get_or_404(id)
+        data = request.get_json()
+        for attr, value in data.items():
+            setattr(admin, attr, value)
         db.session.commit()
-
-        res_dict = admin.to_dict()
-        response = make_response(res_dict, 200)
-        return response
+        return make_response(admin.to_dict(), 200)
     
     def delete(self, id):
-        admin = Admin.query.filter(Admin.admin_id == id).first()
+        admin = Admin.query.get_or_404(id)
         db.session.delete(admin)
         db.session.commit()
-        res_dict = {"message":"admin deleted successfully"}
-        response = make_response(res_dict,200)
-        return response
+        return make_response({"message": "Admin deleted successfully"}, 200)
+
+class DeliveryGuys(Resource):
+    def get(self):
+        delivery_guys_dict_list = [dg.to_dict() for dg in DeliveryGuy.query.all()]
+        return make_response(delivery_guys_dict_list, 200)
+
+    def post(self):
+        data = request.get_json()
+        new_delivery_guy = DeliveryGuy(
+            first_name=data["first_name"],
+            second_name=data["second_name"],
+            address=data["address"],
+            city=data["city"],
+            state=data["state"],
+            phone_number=data["phone_number"],
+            mode=data["mode"],
+            live_location=data.get("live_location"),
+            profile_picture=data.get("profile_picture")
+        )
+        db.session.add(new_delivery_guy)
+        db.session.commit()
+        return make_response(new_delivery_guy.to_dict(), 201)
+
+class DeliveryGuyById(Resource):
+    def get(self, id):
+        delivery_guy = DeliveryGuy.query.get_or_404(id)
+        return make_response(delivery_guy.to_dict(), 200)
     
+    def put(self, id):
+        delivery_guy = DeliveryGuy.query.get_or_404(id)
+        data = request.get_json()
+        for attr, value in data.items():
+            setattr(delivery_guy, attr, value)
+        db.session.commit()
+        return make_response(delivery_guy.to_dict(), 200)
+    
+    def delete(self, id):
+        delivery_guy = DeliveryGuy.query.get_or_404(id)
+        db.session.delete(delivery_guy)
+        db.session.commit()
+        return make_response({"message": "Delivery guy deleted successfully"}, 200)
+
+class Couriers(Resource):
+    def get(self):
+        couriers_dict_list = [courier.to_dict() for courier in Courier.query.all()]
+        return make_response(couriers_dict_list, 200)
+
+    def post(self):
+        data = request.get_json()
+        new_courier = Courier(
+            name=data["name"],
+            address=data["address"],
+            city=data["city"],
+            state=data["state"],
+            phone_number=data["phone_number"],
+            email=data["email"]
+            
+        )
+        db.session.add(new_courier)
+        db.session.commit()
+        return make_response(new_courier.to_dict(), 201)
+
+class CourierById(Resource):
+    def get(self, id):
+        courier = Courier.query.get_or_404(id)
+        return make_response(courier.to_dict(), 200)
+    
+    def put(self, id):
+        courier = Courier.query.get_or_404(id)
+        data = request.get_json()
+        for attr, value in data.items():
+            setattr(courier, attr, value)
+        db.session.commit()
+        return make_response(courier.to_dict(), 200)
+    
+    def delete(self, id):
+        courier = Courier.query.get_or_404(id)
+        db.session.delete(courier)
+        db.session.commit()
+        return make_response({"message": "Courier deleted successfully"}, 200)
+
+# Register resources
+api.add_resource(Admins, '/admins')
 api.add_resource(AdminById, '/admins/<int:id>')
+api.add_resource(DeliveryGuys, '/delivery_guys')
+api.add_resource(DeliveryGuyById, '/delivery_guys/<int:id>')
+api.add_resource(Couriers, '/couriers')
+api.add_resource(CourierById, '/couriers/<int:id>')
 
-
-
-# Main entry point for the application
 if __name__ == '__main__':
     app.run(port=os.getenv('FLASK_RUN_PORT', 5555), debug=app.config['DEBUG'])

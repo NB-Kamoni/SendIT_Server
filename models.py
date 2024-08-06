@@ -18,9 +18,46 @@ class Admin(db.Model, SerializerMixin):
     first_name = db.Column(db.String)
     last_name = db.Column(db.String)
     city = db.Column(db.String)
-    state = db.column(db.String)
+    state = db.Column(db.String)
     branch_code = db.Column(db.String(100))
     profile_pic = db.Column(db.String, nullable=True)  
 
     def __repr__(self):
-        return f'<Admin {self.first_name}, city  {self.city}>'
+        return f'<Admin {self.first_name}, city {self.city}>'
+class DeliveryGuy(db.Model, SerializerMixin):
+    __tablename__ = 'delivery_guys'
+    delivery_guy_id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(50), nullable=False)  # Updated length
+    second_name = db.Column(db.String(50), nullable=False)  # Updated length
+    address = db.Column(db.String(255), nullable=False)  # Updated length
+    city = db.Column(db.String(50), nullable=False)  # Updated length
+    state = db.Column(db.String(50), nullable=False)  # Updated length
+    phone_number = db.Column(db.String(20), nullable=False)
+    mode = db.Column(db.String(50), nullable=False)  # Updated length
+    live_location = db.Column(db.String(255), nullable=True)
+    profile_picture = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f'<DeliveryGuy {self.first_name} {self.second_name}, city {self.city}>'
+
+class Courier(db.Model):
+    __tablename__ = 'couriers' 
+    courier_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    address = db.Column(db.String(120), nullable=False)
+    city = db.Column(db.String(50), nullable=False)
+    state = db.Column(db.String(50), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+  
+
+    def to_dict(self):
+        return {
+            'courier_id': self.courier_id,
+            'name': self.name,
+            'address': self.address,
+            'city': self.city,
+            'state': self.state,
+            'phone_number': self.phone_number,
+            'email': self.email,
+        }
