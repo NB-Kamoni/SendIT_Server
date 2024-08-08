@@ -1,299 +1,221 @@
-import os
-from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask, jsonify, request, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api, Resource
-from models import db, User, Parcel, DeliveryStatus
+from flask_migrate import Migrate
+from flask_cors import CORS
+from firebase_admin import auth, initialize_app, credentials
+import os
 
-# Load environment variables
-load_dotenv()
-
-# Initialize Flask app
+# Initialize the Flask application
 app = Flask(__name__)
+CORS(app)
 
-# Load appropriate configuration based on FLASK_ENV
-if os.getenv('FLASK_ENV') == 'production':
-    app.config.from_object('config.ProductionConfig')
-elif os.getenv('FLASK_ENV') == 'testing':
-    app.config.from_object('config.TestingConfig')
-else:
-    app.config.from_object('config.DevelopmentConfig')
+# Load configuration from environment variables or set defaults
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///sendit.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your_secret_key')
 
-# Configure SQLAlchemy database URI based on environment variables
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-# Set up database URI based on environment (use DB_EXTERNAL_URL by default)
-if os.getenv('FLASK_ENV') == 'production':
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_INTERNAL_URL")
-else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_EXTERNAL_URL")
-
-# Set the Flask app secret key from environment variable
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-
-# Initialize SQLAlchemy with the Flask app
-db.init_app(app)
-
-# Create the app context
-# with app.app_context():
-#     # Create the database tables if they don't exist
-#     # db.create_all()
-
-# Set up Flask-Restful API
+# Initialize SQLAlchemy, Migrate, and API
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 api = Api(app)
 
-# ---------------------Define resource endpoints---------------------------------------------
-# -------------------------USER RESOURCES-------------------------------------------------
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("firebase-adminsdk.json")
+initialize_app(cred)
+
+# Models
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)  # Updated length to 255
+    firebase_uid = db.Column(db.String(255), unique=True, nullable=False)  # Updated length to 255
+    first_name = db.Column(db.String(255), nullable=False)  # Updated length to 255
+    last_name = db.Column(db.String(255), nullable=False)  # Updated length to 255
+    phone_number = db.Column(db.String(20))
+    address = db.Column(db.Text)  # Changed from String(255) to Text for longer addresses
+    role = db.Column(db.String(20))
+    profile_photo_url = db.Column(db.Text)  # Changed from String(255) to Text
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'firebase_uid': self.firebase_uid,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'phone_number': self.phone_number,
+            'address': self.address,
+            'role': self.role,
+            'profile_photo_url': self.profile_photo_url
+        }
+
+class Parcel(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    weight = db.Column(db.Float, nullable=False)
+    length = db.Column(db.Float, nullable=False)
+    width = db.Column(db.Float, nullable=False)
+    height = db.Column(db.Float, nullable=False)
+    value = db.Column(db.Float, nullable=False)
+    pickup_location = db.Column(db.Text, nullable=False)  # Changed from String(255) to Text
+    drop_off_location = db.Column(db.Text, nullable=False)  # Changed from String(255) to Text
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    courier_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    delivery_status = db.Column(db.String(20), default='pending')  # Updated length to 20 for consistency
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'weight': self.weight,
+            'length': self.length,
+            'width': self.width,
+            'height': self.height,
+            'value': self.value,
+            'pickup_location': self.pickup_location,
+            'drop_off_location': self.drop_off_location,
+            'sender_id': self.sender_id,
+            'recipient_id': self.recipient_id,
+            'courier_id': self.courier_id,
+            'delivery_status': self.delivery_status
+        }
+
+# Firebase authentication decorator
+def firebase_required(f):
+    def decorator(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return make_response(jsonify({'message': 'Missing or invalid authorization header'}), 401)
+        
+        token = auth_header.split(' ')[1]
+        try:
+            decoded_token = auth.verify_id_token(token)
+            request.user = decoded_token
+        except Exception as e:
+            return make_response(jsonify({'message': 'Invalid token', 'error': str(e)}), 401)
+        
+        return f(*args, **kwargs)
+    
+    decorator.__name__ = f.__name__
+    return decorator
+
+# API Resources
+class UserListResource(Resource):
+    # @firebase_required
+    def get(self):
+        users = User.query.all()
+        return jsonify([user.to_dict() for user in users])
+
+    @firebase_required
+    def post(self):
+        data = request.json
+        email = request.user.get('email')
+        firebase_uid = request.user.get('uid')
+
+        user = User(
+            email=email,
+            firebase_uid=firebase_uid,
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            phone_number=data.get('phone_number'),
+            address=data.get('address'),
+            role=data['role'],
+            profile_photo_url=data.get('profile_photo_url')
+        )
+        db.session.add(user)
+        db.session.commit()
+        return jsonify(user.to_dict()), 201
 
 class UserResource(Resource):
-    def get(self):
-        """
-        Fetches either all users or a specific user by user_id, email, or name.
-        """
-        user_id = request.args.get('user_id')
-        email = request.args.get('email')
-        name = request.args.get('name')
+    # @firebase_required
+    def get(self, user_id):
+        user = User.query.get_or_404(user_id)
+        return jsonify(user.to_dict())
 
-        if user_id:
-            user = User.query.filter_by(user_id=user_id).first()
-            if user:
-                return {'user': user.to_dict()}
-            else:
-                return {'message': 'User not found'}, 404
-
-        elif email:
-            user = User.query.filter_by(email=email).first()
-            if user:
-                return {'user': user.to_dict()}
-            else:
-                return {'message': 'User not found'}, 404
-
-        elif name:
-            users = User.query.filter(User.name.ilike(f'%{name}%')).all()
-            if users:
-                return {'users': [user.to_dict() for user in users]}
-            else:
-                return {'message': 'User not found'}, 404
-
-        else:
-            users = User.query.all()
-            return {'users': [user.to_dict() for user in users]}
-
-    def post(self):
-        """
-        Registers a new user.
-        """
-        data = request.get_json()
-        new_user = User(
-            name=data.get('name'),
-            email=data.get('email'),
-            password=data.get('password'),
-            # Add other fields if necessary
-        )
-        db.session.add(new_user)
-        db.session.commit()
-        return new_user.to_dict(), 201
-
+    # @firebase_required
     def put(self, user_id):
-        """
-        Updates information for a specific user identified by user_id.
-        """
-        data = request.get_json()
-        user = User.query.get(user_id)
-        if not user:
-            return {'message': 'User not found'}, 404
-
-        # Update user fields based on data provided
-        if 'name' in data:
-            user.name = data['name']
-        if 'email' in data:
-            user.email = data['email']
-        if 'password' in data:
-            user.password = data['password']
-
+        user = User.query.get_or_404(user_id)
+        data = request.json
+        user.email = data.get('email', user.email)
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.phone_number = data.get('phone_number', user.phone_number)
+        user.address = data.get('address', user.address)
+        user.role = data.get('role', user.role)
+        user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
         db.session.commit()
-        return user.to_dict()
+        return jsonify(user.to_dict())
 
+    # @firebase_required
     def delete(self, user_id):
-        """
-        Deletes a specific user identified by user_id.
-        """
-        user = User.query.get(user_id)
-        if not user:
-            return {'message': 'User not found'}, 404
-
+        user = User.query.get_or_404(user_id)
         db.session.delete(user)
         db.session.commit()
-        return {'message': 'User deleted'}, 204
+        return '', 204
 
-# Add resource endpoints to API
-api.add_resource(UserResource, '/users', '/users/<int:user_id>')
+class ParcelListResource(Resource):
+    # @firebase_required
+    def get(self):
+        parcels = Parcel.query.all()
+        return jsonify([parcel.to_dict() for parcel in parcels])
 
-# View all users:        GET /users
-# Add new user:          POST /users
-# Change user data:      PUT /users/<user_id>
-# Delete users:          DELETE /users/<user_id>
-# Search user by id:     GET /users?user_id=<user_id>
-# Search user by email:  GET /users?email=<email>
-# Search user by name:   GET /users?name=<name>
-
-# -------------------------PARCEL RESOURCES-------------------------------------------------
+    # @firebase_required
+    def post(self):
+        data = request.json
+        parcel = Parcel(
+            weight=data['weight'],
+            length=data['length'],
+            width=data['width'],
+            height=data['height'],
+            value=data['value'],
+            pickup_location=data['pickup_location'],
+            drop_off_location=data['drop_off_location'],
+            sender_id=data['sender_id'],
+            recipient_id=data['recipient_id'],
+            courier_id=data.get('courier_id'),
+            delivery_status=data.get('delivery_status', 'pending')
+        )
+        db.session.add(parcel)
+        db.session.commit()
+        return jsonify(parcel.to_dict()), 201
 
 class ParcelResource(Resource):
-    def get(self):
-        """
-        Fetches either all parcels or a specific parcel by parcel_id or user_id.
-        """
-        parcel_id = request.args.get('parcel_id')
-        user_id = request.args.get('user_id')
+    # @firebase_required
+    def get(self, parcel_id):
+        parcel = Parcel.query.get_or_404(parcel_id)
+        return jsonify(parcel.to_dict())
 
-        if parcel_id:
-            parcel = Parcel.query.filter_by(parcel_id=parcel_id).first()
-            if parcel:
-                return {'parcel': parcel.to_dict()}
-            else:
-                return {'message': 'Parcel not found'}, 404
-
-        elif user_id:
-            parcels = Parcel.query.filter_by(user_id=user_id).all()
-            if parcels:
-                return {'parcels': [parcel.to_dict() for parcel in parcels]}
-            else:
-                return {'message': 'No parcels found for this user'}, 404
-
-        else:
-            parcels = Parcel.query.all()
-            return {'parcels': [parcel.to_dict() for parcel in parcels]}
-
-    def post(self):
-        """
-        Creates a new parcel.
-        """
-        data = request.get_json()
-        new_parcel = Parcel(
-            user_id=data.get('user_id'),
-            origin=data.get('origin'),
-            destination=data.get('destination'),
-            weight=data.get('weight'),
-            status=data.get('status'),
-            # Add other fields if necessary
-        )
-        db.session.add(new_parcel)
-        db.session.commit()
-        return new_parcel.to_dict(), 201
-
+    # @firebase_required
     def put(self, parcel_id):
-        """
-        Updates information for a specific parcel identified by parcel_id.
-        """
-        data = request.get_json()
-        parcel = Parcel.query.get(parcel_id)
-        if not parcel:
-            return {'message': 'Parcel not found'}, 404
-
-        # Update parcel fields based on data provided
-        if 'origin' in data:
-            parcel.origin = data['origin']
-        if 'destination' in data:
-            parcel.destination = data['destination']
-        if 'weight' in data:
-            parcel.weight = data['weight']
-        if 'status' in data:
-            parcel.status = data['status']
-
+        parcel = Parcel.query.get_or_404(parcel_id)
+        data = request.json
+        parcel.weight = data.get('weight', parcel.weight)
+        parcel.length = data.get('length', parcel.length)
+        parcel.width = data.get('width', parcel.width)
+        parcel.height = data.get('height', parcel.height)
+        parcel.value = data.get('value', parcel.value)
+        parcel.pickup_location = data.get('pickup_location', parcel.pickup_location)
+        parcel.drop_off_location = data.get('drop_off_location', parcel.drop_off_location)
+        parcel.sender_id = data.get('sender_id', parcel.sender_id)
+        parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
+        parcel.courier_id = data.get('courier_id', parcel.courier_id)
+        parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
         db.session.commit()
-        return parcel.to_dict()
+        return jsonify(parcel.to_dict())
 
+    # @firebase_required
     def delete(self, parcel_id):
-        """
-        Deletes a specific parcel identified by parcel_id.
-        """
-        parcel = Parcel.query.get(parcel_id)
-        if not parcel:
-            return {'message': 'Parcel not found'}, 404
-
+        parcel = Parcel.query.get_or_404(parcel_id)
         db.session.delete(parcel)
         db.session.commit()
-        return {'message': 'Parcel deleted'}, 204
+        return '', 204
 
-# Add resource endpoints to API
-api.add_resource(ParcelResource, '/parcels', '/parcels/<int:parcel_id>')
+# Register API Resources
+api.add_resource(UserListResource, '/users')
+api.add_resource(UserResource, '/users/<int:user_id>')
+api.add_resource(ParcelListResource, '/parcels')
+api.add_resource(ParcelResource, '/parcels/<int:parcel_id>')
 
-# View all parcels:       GET /parcels
-# Add new parcel:         POST /parcels
-# Change parcel data:     PUT /parcels/<parcel_id>
-# Delete parcels:         DELETE /parcels/<parcel_id>
-# Search parcel by id:    GET /parcels?parcel_id=<parcel_id>
-# Search parcels by user: GET /parcels?user_id=<user_id>
-
-# -------------------------DELIVERY STATUS RESOURCES-------------------------------------------------
-
-class DeliveryStatusResource(Resource):
-    def get(self, parcel_id):
-        """
-        Fetches the delivery status of a specific parcel identified by parcel_id.
-        """
-        delivery_status = DeliveryStatus.query.filter_by(parcel_id=parcel_id).first()
-        if delivery_status:
-            return delivery_status.to_dict()
-        else:
-            return {'message': 'Delivery status not found'}, 404
-
-    def post(self, parcel_id):
-        """
-        Creates a new delivery status for the parcel identified by parcel_id.
-        """
-        data = request.get_json()
-        new_status = DeliveryStatus(
-            parcel_id=parcel_id,
-            status=data.get('status'),
-            location=data.get('location'),
-            timestamp=data.get('timestamp')
-        )
-        db.session.add(new_status)
-        db.session.commit()
-        return new_status.to_dict(), 201
-
-    def put(self, parcel_id):
-        """
-        Updates the delivery status of the parcel identified by parcel_id.
-        """
-        data = request.get_json()
-        delivery_status = DeliveryStatus.query.filter_by(parcel_id=parcel_id).first()
-        if not delivery_status:
-            return {'message': 'Delivery status not found'}, 404
-
-        # Update status fields based on data provided
-        if 'status' in data:
-            delivery_status.status = data['status']
-        if 'location' in data:
-            delivery_status.location = data['location']
-        if 'timestamp' in data:
-            delivery_status.timestamp = data['timestamp']
-
-        db.session.commit()
-        return delivery_status.to_dict()
-
-    def delete(self, parcel_id):
-        """
-        Deletes the delivery status of the parcel identified by parcel_id.
-        """
-        delivery_status = DeliveryStatus.query.filter_by(parcel_id=parcel_id).first()
-        if not delivery_status:
-            return {'message': 'Delivery status not found'}, 404
-
-        db.session.delete(delivery_status)
-        db.session.commit()
-        return {'message': 'Delivery status deleted'}, 204
-
-# Add resource endpoints to API
-api.add_resource(DeliveryStatusResource, '/parcels/<int:parcel_id>/status')
-
-# Fetch delivery status:  GET /parcels/<parcel_id>/status
-# Create new status:      POST /parcels/<parcel_id>/status
-# Update status:          PUT /parcels/<parcel_id>/status
-# Delete status:          DELETE /parcels/<parcel_id>/status
-
-# Main entry point for the application
 if __name__ == '__main__':
-    app.run(port=os.getenv('FLASK_RUN_PORT', 5555), debug=app.config['DEBUG'])
+    with app.app_context():
+        db.create_all()  # Create tables for models if they don't exist
+    app.run(debug=True)

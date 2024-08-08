@@ -1,160 +1,66 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
-from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy import MetaData, Enum, ForeignKey, Integer, String, Text, Float, DateTime, Column
+from sqlalchemy.orm import relationship
 from sqlalchemy_serializer import SerializerMixin
 from datetime import datetime
 
+# Define metadata with naming convention
 metadata = MetaData(
     naming_convention={
         "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     }
 )
 
+# Initialize the SQLAlchemy object with custom metadata
 db = SQLAlchemy(metadata=metadata)
 
-class Client(db.Model, SerializerMixin):
-    __tablename__ = 'client'
+class User(db.Model, SerializerMixin):
+    __tablename__ = 'users'
     
-    ClientID = db.Column(db.Integer, primary_key=True)
-    Email = db.Column(db.String, index=True, unique=True)
-    State = db.Column(db.String)
-    City = db.Column(db.String)
-    Address = db.Column(db.String)
-    PhoneNumber = db.Column(db.String)
-    FirstName = db.Column(db.String)
-    LastName = db.Column(db.String)
-    ProfilePicture = db.Column(db.String)
+    # Serialization rules to exclude certain fields
+    serialize_rules = ('-sent_parcels', '-received_parcels', '-courier_parcels')
 
-    # Relationships
-    sent_parcels = db.relationship('Parcel', foreign_keys='Parcel.SenderID', backref='sender', lazy=True)
-    received_parcels = db.relationship('Parcel', foreign_keys='Parcel.RecipientID', backref='recipient', lazy=True)
+    # Define columns
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    firebase_uid = Column(String(255), unique=True, nullable=False)
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    phone_number = Column(String(20))
+    address = Column(Text)
+    role = Column(Enum('admin', 'client', 'individual_courier', 'corporate_courier', name='user_roles'), nullable=False)
+    profile_photo_url = Column(Text)
 
-    serialize_rules = ('-sent_parcels', '-received_parcels')  
+    # Define relationships
+    sent_parcels = relationship('Parcel', backref='sender', foreign_keys='Parcel.sender_id', lazy=True)
+    received_parcels = relationship('Parcel', backref='recipient', foreign_keys='Parcel.recipient_id', lazy=True)
+    courier_parcels = relationship('Parcel', backref='courier', foreign_keys='Parcel.courier_id', lazy=True)
 
     def __repr__(self):
-        return (f'<Client(ClientID={self.ClientID}, Email={self.Email}, '
-                f'FirstName={self.FirstName}, LastName={self.LastName})>')
-
-class Admin(db.Model, SerializerMixin):
-    __tablename__ = 'admin'
-    
-    AdminID = db.Column(db.Integer, primary_key=True)
-    FirstName = db.Column(db.String)
-    SecondName = db.Column(db.String)
-    City = db.Column(db.String)
-    State = db.Column(db.String)
-    BranchCode = db.Column(db.String)
-    ProfilePicture = db.Column(db.String)
-
-    # Relationships
-    allocations = db.relationship('AdminDeliveryGuyAllocation', backref='admin', lazy=True)
-
-    serialize_rules = ('-allocations',)  
-
-    def __repr__(self):
-        return (f'<Admin(AdminID={self.AdminID}, FirstName={self.FirstName}, '
-                f'SecondName={self.SecondName}, BranchCode={self.BranchCode})>')
-
-class ParcelStatus(db.Model, SerializerMixin):
-    __tablename__ = 'parcel_status'
-    
-    StatusID = db.Column(db.Integer, primary_key=True)
-    Name = db.Column(db.String, unique=True)
-    cancelled = db.Column(db.Boolean, default=False)
-    delivered = db.Column(db.Boolean, default=False)
-    posted = db.Column(db.Boolean, default=False)
-    en_route = db.Column(db.Boolean, default=False)
-
-    # Relationships
-    parcels = db.relationship('Parcel', backref='status', lazy=True)
-
-    serialize_rules = ('-parcels',)  
-
-    def __repr__(self):
-        return f'<ParcelStatus(Name={self.Name})>'
-
-class DeliveryGuy(db.Model, SerializerMixin):
-    __tablename__ = 'delivery_guy'
-    
-    DeliveryGuyID = db.Column(db.Integer, primary_key=True)
-    FirstName = db.Column(db.String)
-    SecondName = db.Column(db.String)
-    Address = db.Column(db.String)
-    City = db.Column(db.String)
-    State = db.Column(db.String)
-    PhoneNumber = db.Column(db.String)
-    Mode = db.Column(db.String)
-    LiveLocation = db.Column(db.String)
-    ProfilePictureURL = db.Column(db.String)
-
-    # Relationships
-    parcels = db.relationship('Parcel', backref='delivery_guy', lazy=True)
-    allocations = db.relationship('AdminDeliveryGuyAllocation', backref='delivery_guy', lazy=True)
-
-    serialize_rules = ('-parcels', '-allocations') 
-
-    def __repr__(self):
-        return (f'<DeliveryGuy(DeliveryGuyID={self.DeliveryGuyID}, '
-                f'FirstName={self.FirstName}, LastName={self.SecondName})>')
+        return f'<User(id={self.id}, email={self.email}, role={self.role})>'
 
 class Parcel(db.Model, SerializerMixin):
-    __tablename__ = 'parcel'
+    __tablename__ = 'parcels'
     
-    ParcelID = db.Column(db.Integer, primary_key=True)
-    Weight = db.Column(db.Float)
-    Origin = db.Column(db.String)
-    Destination = db.Column(db.String)
-    SenderID = db.Column(db.Integer, db.ForeignKey('client.ClientID'))
-    RecipientID = db.Column(db.Integer, db.ForeignKey('client.ClientID'))
-    StatusID = db.Column(db.Integer, db.ForeignKey('parcel_status.StatusID'))
-    DeliveryGuyID = db.Column(db.Integer, db.ForeignKey('delivery_guy.DeliveryGuyID'))
-    DeliveryStatusID = db.Column(db.Integer, db.ForeignKey('delivery_status.DeliveryStatusID'))  # New foreign key
+    # Serialization rules to exclude certain fields
+    serialize_rules = ('-sender', '-recipient', '-courier')
 
-    serialize_rules = ('-sender', '-recipient', '-status', '-delivery_guy', '-delivery_status')  
+    # Define columns
+    id = Column(Integer, primary_key=True)
+    weight = Column(Float, nullable=False)
+    length = Column(Float, nullable=False)
+    width = Column(Float, nullable=False)
+    height = Column(Float, nullable=False)
+    value = Column(Float, nullable=False)
+    pickup_location = Column(Text, nullable=False)
+    drop_off_location = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    delivery_status = Column(Enum('pending', 'in_transit', 'delivered', 'cancelled', name='delivery_statuses'), default='pending', nullable=False)
+
+    # Define foreign keys
+    sender_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    courier_id = Column(Integer, ForeignKey('users.id'), nullable=True)
 
     def __repr__(self):
-        return (f'<Parcel(ParcelID={self.ParcelID}, Weight={self.Weight}, '
-                f'Origin={self.Origin}, Destination={self.Destination})>')
-
-class AdminDeliveryGuyAllocation(db.Model, SerializerMixin):
-    __tablename__ = 'admin_delivery_guy_allocation'
-    
-    AllocationID = db.Column(db.Integer, primary_key=True)
-    AdminID = db.Column(db.Integer, db.ForeignKey('admin.AdminID'))
-    DeliveryGuyID = db.Column(db.Integer, db.ForeignKey('delivery_guy.DeliveryGuyID'))
-    ParcelID = db.Column(db.Integer, db.ForeignKey('parcel.ParcelID'))
-    AllocatedAt = db.Column(db.DateTime, default=datetime.utcnow)
-    PickUpLocation = db.Column(db.String)
-    DropOffLocation = db.Column(db.String)
-
-    serialize_rules = ('-admin', '-delivery_guy', '-parcel') 
-    def __repr__(self):
-        return (f'<AdminDeliveryGuyAllocation(AllocationID={self.AllocationID}, '
-                f'AdminID={self.AdminID}, DeliveryGuyID={self.DeliveryGuyID})>')
-
-class User(db.Model, SerializerMixin):
-    __tablename__ = 'user'
-    
-    UserID = db.Column(db.Integer, primary_key=True)
-    Username = db.Column(db.String, index=True, unique=True)
-    PasswordHash = db.Column(db.String)
-    Email = db.Column(db.String, index=True, unique=True)
-    CreatedAt = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def __repr__(self):
-        return f'<User(UserID={self.UserID}, Username={self.Username}, Email={self.Email})>'
-
-class DeliveryStatus(db.Model, SerializerMixin):
-    __tablename__ = 'delivery_status'
-    
-    DeliveryStatusID = db.Column(db.Integer, primary_key=True)
-    Name = db.Column(db.String, unique=True)
-    Description = db.Column(db.String)
-
-    # Relationships
-    parcels = db.relationship('Parcel', backref='delivery_status', lazy=True)
-
-    serialize_rules = ('-parcels',)  
-
-    def __repr__(self):
-        return f'<DeliveryStatus(Name={self.Name})>'
+        return f'<Parcel(id={self.id}, status={self.delivery_status}, sender={self.sender_id}, recipient={self.recipient_id})>'
