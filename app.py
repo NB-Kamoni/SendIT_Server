@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from models import db, Admin, DeliveryGuy, Courier
+from models import db, Admin, DeliveryGuy, Courier, Client
 from flask import Flask, request, make_response, jsonify
 from sqlalchemy import MetaData
 from flask_sqlalchemy import SQLAlchemy
@@ -230,6 +230,50 @@ class CourierById(Resource):
         db.session.delete(courier)
         db.session.commit()
         return make_response({"message": "Courier deleted successfully"}, 200)
+    
+
+class Clients(Resource):
+    def get(self):
+        clients_dict_list = [client.to_dict() for client in Client.query.all()]
+        return make_response(clients_dict_list, 200)
+    
+    def post(self):
+        data = request.get_json()
+        new_client = Client(
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            city=data["city"],
+            state=data["state"],
+            address=data["address"],
+            email=data["email"],
+            phone_no=data["phone_no"],
+            profile_pic=data.get("profile_pic")
+        )
+        db.session.add(new_client)
+        db.session.commit()
+        return make_response(new_client.to_dict(), 201)
+
+
+class ClientById(Resource):
+    def get(self, id):
+        client = Client.query.get_or_404(id)
+        return make_response(client.to_dict(), 200)
+    
+    def patch(self, id):
+        client = Client.query.get_or_404(id)
+        data = request.get_json()
+        for attr, value in data.items():
+            setattr(client, attr, value)
+        db.session.commit()
+        return make_response(client.to_dict(), 200)
+    
+    def delete(self, id):
+        client = Client.query.get_or_404(id)
+        db.session.delete(client)
+        db.session.commit()
+        return make_response({"message": "Client deleted successfully"}, 200)
+
+
 
 # Register resources
 api.add_resource(Admins, '/admins')
@@ -238,6 +282,9 @@ api.add_resource(DeliveryGuys, '/delivery_guys')
 api.add_resource(DeliveryGuyById, '/delivery_guys/<int:id>')
 api.add_resource(Couriers, '/couriers')
 api.add_resource(CourierById, '/couriers/<int:id>')
+api.add_resource(Clients, '/clients')
+api.add_resource(ClientById, '/clients/<int:id>')
+
 
 if __name__ == '__main__':
     app.run(port=os.getenv('FLASK_RUN_PORT', 5555), debug=app.config['DEBUG'])

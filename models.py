@@ -81,3 +81,31 @@ class Courier(db.Model):
             'phone_number': self.phone_number,
             'email': self.email,
         }
+
+
+# class ParcelStatus(db.Model, SerializerMixin):
+#     __tablename__ = 'parcelstatuses'
+#     status_id = db.Column(db.Integer, primary_key=True)
+#     name = db.Column(db.String)
+#     cancelled = db.Column(db.Boolean())
+#     delivered = db.Column(db.Boolean())
+#     posted = db.Column(db.Boolean())
+#     en_route = db.Column(db.Boolean())
+
+
+class Client(db.Model, SerializerMixin):
+    __tablename__ = 'clients'
+    client_id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String)
+    last_name = db.Column(db.String)
+    city = db.Column(db.String)
+    state = db.Column(db.String)
+    address = db.Column(db.String)
+    email = db.Column(db.String)
+    phone_no = db.Column(db.String(10))
+    profile_pic = db.Column(db.String, nullable=True)  
+
+
+    def __repr__(self):
+        return f'<Client {self.first_name}, city {self.city}>'
+    
