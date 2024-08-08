@@ -19,11 +19,22 @@ class Admin(db.Model, SerializerMixin):
     last_name = db.Column(db.String)
     city = db.Column(db.String)
     state = db.Column(db.String)
-    branch_code = db.Column(db.String(100))
+    branch_code = db.Column(db.String(20))
     profile_pic = db.Column(db.String, nullable=True)  
+
+    #Relationships
+    delGuys= db.relationship('DeliveryGuy', back_populates="admin", cascade='all, delete-orphan')
+
+    # add serialization rules
+    serialize_rules = ('-delGuys.admin',)
+
+    deliveryGuys = association_proxy('delGuys', 'deliveryGuy')
+
 
     def __repr__(self):
         return f'<Admin {self.first_name}, city {self.city}>'
+    
+
 class DeliveryGuy(db.Model, SerializerMixin):
     __tablename__ = 'delivery_guys'
     delivery_guy_id = db.Column(db.Integer, primary_key=True)
@@ -35,7 +46,16 @@ class DeliveryGuy(db.Model, SerializerMixin):
     phone_number = db.Column(db.String(20), nullable=False)
     mode = db.Column(db.String(50), nullable=False)  # Updated length
     live_location = db.Column(db.String(255), nullable=True)
-    profile_picture = db.Column(db.String(255), nullable=True)
+    profile_picture = db.Column(db.String, nullable=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admins.admin_id'))
+
+    #Relationships
+    admin = db.relationship('Admin', back_populates="delGuys")
+
+    # add serialization rules
+    serialize_rules = ('-admin.deliveryGuy',)
+     
+
 
     def __repr__(self):
         return f'<DeliveryGuy {self.first_name} {self.second_name}, city {self.city}>'
@@ -61,3 +81,31 @@ class Courier(db.Model):
             'phone_number': self.phone_number,
             'email': self.email,
         }
+
+
+# class ParcelStatus(db.Model, SerializerMixin):
+#     __tablename__ = 'parcelstatuses'
+#     status_id = db.Column(db.Integer, primary_key=True)
+#     name = db.Column(db.String)
+#     cancelled = db.Column(db.Boolean())
+#     delivered = db.Column(db.Boolean())
+#     posted = db.Column(db.Boolean())
+#     en_route = db.Column(db.Boolean())
+
+
+class Client(db.Model, SerializerMixin):
+    __tablename__ = 'clients'
+    client_id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String)
+    last_name = db.Column(db.String)
+    city = db.Column(db.String)
+    state = db.Column(db.String)
+    address = db.Column(db.String)
+    email = db.Column(db.String)
+    phone_no = db.Column(db.String(10))
+    profile_pic = db.Column(db.String, nullable=True)  
+
+
+    def __repr__(self):
+        return f'<Client {self.first_name}, city {self.city}>'
+    

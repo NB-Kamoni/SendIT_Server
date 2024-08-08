@@ -1,6 +1,6 @@
 from datetime import date
 from app import app, db
-from models import Admin, DeliveryGuy, Courier
+from models import Admin, DeliveryGuy, Courier, Client
 
 with app.app_context():
     # Drop all tables and create them again
@@ -11,8 +11,26 @@ with app.app_context():
     ad1 = Admin(first_name="John", last_name="Doe", city="Nairobi", state="Kenya", branch_code="57hg", profile_pic="https://media.istockphoto.com/id/1327592506/vector/default-avatar-photo-placeholder-icon-grey-profile-picture-business-man.jpg?s=1024x1024&w=is&k=20&c=er-yFBCv5wYO_curZ-MILgW0ECSjt0DDg5OlwpsAgZM=")
     ad2 = Admin(first_name="Jane", last_name="Doe", city="Nairobi", state="Kenya", branch_code="57hg", profile_pic="https://media.istockphoto.com/id/1327592506/vector/default-avatar-photo-placeholder-icon-grey-profile-picture-business-man.jpg?s=1024x1024&w=is&k=20&c=er-yFBCv5wYO_curZ-MILgW0ECSjt0DDg5OlwpsAgZM=")
 
-   db.session.add_all([ad1,ad2])
+    db.session.add_all([ad1,ad2])
     db.session.commit()
+
+    
+
+    #Client
+    cli1 = Client(
+        first_name="Jane",
+        last_name="Jan",
+        city="Washington",
+        state="America",
+        address="5th Street",
+        email="cli@clientSendit.com",
+        phone_no="0126758937",
+        profile_pic="https://www.google.com/imgres?q=profile%20images&imgurl=https%3A%2F%2Fi.pinimg.com%2F236x%2F10%2Ffd%2F72%2F10fd72124736cfa1b9840c5ee543b0cf.jpg&imgrefurl=https%3A%2F%2Fid.pinterest.com%2Fstrawberryblushing%2Faesthetic-blank-profile-picture%2F&docid=U2oCIMNEFsGFzM&tbnid=8yDBrfRgez280M&vet=12ahUKEwjZ2LqMmuaHAxVzBtsEHcD-DDwQM3oFCIIBEAA..i&w=236&h=236&hcb=2&ved=2ahUKEwjZ2LqMmuaHAxVzBtsEHcD-DDwQM3oFCIIBEAA"
+    )
+
+    db.session.add_all([cli1])
+    db.session.commit()
+    print("Database seeded successfully!")
 
 
   # Create Couriers
@@ -26,7 +44,6 @@ c1 = Courier(
 )
 
 
-    print("Database seeded successfully!")
 
 c2 = Courier(
     name="Rapid Delivery",
