@@ -24,3 +24,4 @@ app.db
 # Environment variables
 .env
 firebase-adminsdk.json
+firebase_credentials_base64.txt

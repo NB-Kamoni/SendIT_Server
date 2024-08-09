@@ -5,6 +5,8 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from firebase_admin import auth, initialize_app, credentials
 import os
+import base64
+import json
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -20,8 +22,16 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 api = Api(app)
 
+# Decode Firebase credentials from environment variable
+firebase_credentials_base64 = os.getenv('FIREBASE_CREDENTIALS_BASE64')
+if not firebase_credentials_base64:
+    raise Exception("Firebase credentials not found in environment variables")
+
+firebase_credentials_json = base64.b64decode(firebase_credentials_base64)
+firebase_credentials = json.loads(firebase_credentials_json)
+
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate("firebase-adminsdk.json")
+cred = credentials.Certificate(firebase_credentials)
 initialize_app(cred)
 
 # Models
@@ -228,5 +238,6 @@ api.add_resource(UserResource, '/users/<int:user_id>')
 api.add_resource(ParcelListResource, '/parcels')
 api.add_resource(ParcelResource, '/parcels/<int:parcel_id>')
 
+# Run the app
 if __name__ == '__main__':
     app.run(debug=True)
