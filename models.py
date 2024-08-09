@@ -30,6 +30,7 @@ class User(db.Model, SerializerMixin):
     address = Column(Text)
     role = Column(Enum('admin', 'client', 'individual_courier', 'corporate_courier', name='user_roles'), nullable=False)
     profile_photo_url = Column(Text)
+    account_balance = Column(Float, default=0.0, nullable=False)  # New field
 
     # Define relationships
     sent_parcels = relationship('Parcel', backref='sender', foreign_keys='Parcel.sender_id', lazy=True)
@@ -56,6 +57,8 @@ class Parcel(db.Model, SerializerMixin):
     drop_off_location = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     delivery_status = Column(Enum('pending', 'in_transit', 'delivered', 'cancelled', name='delivery_statuses'), default='pending', nullable=False)
+    shipping_cost = Column(Float, nullable=False)  # New field
+    distance = Column(Float, nullable=False)  # New field
 
     # Define foreign keys
     sender_id = Column(Integer, ForeignKey('users.id'), nullable=False)

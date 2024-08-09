@@ -1,93 +1,26 @@
-from app import app, db
-from app import User, Parcel
+from app import db, User, Parcel, app  # Import 'app' from your Flask application
 
-# Clear existing data in tables
-def clear_data():
-    db.session.query(Parcel).delete()
-    db.session.query(User).delete()
-    db.session.commit()
-
-# Create seed data
 def seed_data():
-    # Create users
-    users = [
-        User(
-            email="user1@example.com",
-            firebase_uid="uid1",
-            first_name="John",
-            last_name="Doe",
-            phone_number="1234567890",
-            address="123 Main St, Anytown, USA",
-            role="client",
-            profile_photo_url="http://example.com/photo1.jpg"
-        ),
-        User(
-            email="user2@example.com",
-            firebase_uid="uid2",
-            first_name="Jane",
-            last_name="Smith",
-            phone_number="0987654321",
-            address="456 Elm St, Othertown, USA",
-            role="courier",
-            profile_photo_url="http://example.com/photo2.jpg"
-        ),
-        User(
-            email="user3@example.com",
-            firebase_uid="uid3",
-            first_name="Alice",
-            last_name="Brown",
-            phone_number="1122334455",
-            address="789 Oak St, Anycity, USA",
-            role="admin",
-            profile_photo_url="http://example.com/photo3.jpg"
-        )
-    ]
+    with app.app_context():  # Create an application context
+        db.create_all()
 
-    # Add users to the session
-    db.session.add_all(users)
-    db.session.commit()
+        # Create users
+        user1 = User(email='client@example.com', firebase_uid='client_uid', first_name='Client', last_name='User', role='client', account_balance=100.0)
+        user2 = User(email='courier@example.com', firebase_uid='courier_uid', first_name='Courier', last_name='User', role='individual_courier', account_balance=50.0)
+        user3 = User(email='admin@example.com', firebase_uid='admin_uid', first_name='Admin', last_name='User', role='admin', account_balance=500.0)
+        
+        # Add users to the session
+        db.session.add_all([user1, user2, user3])
+        
+        # Create parcels
+        parcel1 = Parcel(weight=10.0, length=20.0, width=30.0, height=40.0, value=100.0, pickup_location='Location A', drop_off_location='Location B', sender_id=1, recipient_id=2, shipping_cost=25.0, distance=15.0)
+        parcel2 = Parcel(weight=5.0, length=10.0, width=15.0, height=20.0, value=50.0, pickup_location='Location C', drop_off_location='Location D', sender_id=2, recipient_id=1, shipping_cost=15.0, distance=10.0)
+        
+        # Add parcels to the session
+        db.session.add_all([parcel1, parcel2])
+        
+        # Commit the session
+        db.session.commit()
 
-    # Create parcels
-    parcels = [
-        Parcel(
-            weight=2.5,
-            length=30.0,
-            width=20.0,
-            height=10.0,
-            value=100.00,
-            pickup_location="123 Main St, Anytown, USA",
-            drop_off_location="789 Oak St, Anycity, USA",
-            sender_id=users[0].id,
-            recipient_id=users[2].id,
-            courier_id=users[1].id,
-            delivery_status="pending"
-        ),
-        Parcel(
-            weight=5.0,
-            length=50.0,
-            width=30.0,
-            height=15.0,
-            value=250.00,
-            pickup_location="456 Elm St, Othertown, USA",
-            drop_off_location="789 Oak St, Anycity, USA",
-            sender_id=users[2].id,
-            recipient_id=users[0].id,
-            courier_id=users[1].id,
-            delivery_status="shipped"
-        )
-    ]
-
-    # Add parcels to the session
-    db.session.add_all(parcels)
-    db.session.commit()
-
-# Seed the database
 if __name__ == '__main__':
-    with app.app_context():  # Ensure the operations are within the app context
-        # Clear existing data
-        clear_data()
-
-        # Seed the data
-        seed_data()
-
-    print("Database seeded successfully!")
+    seed_data()

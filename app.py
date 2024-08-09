@@ -27,14 +27,15 @@ initialize_app(cred)
 # Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False)  # Updated length to 255
-    firebase_uid = db.Column(db.String(255), unique=True, nullable=False)  # Updated length to 255
-    first_name = db.Column(db.String(255), nullable=False)  # Updated length to 255
-    last_name = db.Column(db.String(255), nullable=False)  # Updated length to 255
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    firebase_uid = db.Column(db.String(255), unique=True, nullable=False)
+    first_name = db.Column(db.String(255), nullable=False)
+    last_name = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(20))
-    address = db.Column(db.Text)  # Changed from String(255) to Text for longer addresses
+    address = db.Column(db.Text)
     role = db.Column(db.String(20))
-    profile_photo_url = db.Column(db.Text)  # Changed from String(255) to Text
+    profile_photo_url = db.Column(db.Text)
+    account_balance = db.Column(db.Float, default=0.0, nullable=False)  # New field
 
     def to_dict(self):
         return {
@@ -46,7 +47,8 @@ class User(db.Model):
             'phone_number': self.phone_number,
             'address': self.address,
             'role': self.role,
-            'profile_photo_url': self.profile_photo_url
+            'profile_photo_url': self.profile_photo_url,
+            'account_balance': self.account_balance  # New field
         }
 
 class Parcel(db.Model):
@@ -56,12 +58,14 @@ class Parcel(db.Model):
     width = db.Column(db.Float, nullable=False)
     height = db.Column(db.Float, nullable=False)
     value = db.Column(db.Float, nullable=False)
-    pickup_location = db.Column(db.Text, nullable=False)  # Changed from String(255) to Text
-    drop_off_location = db.Column(db.Text, nullable=False)  # Changed from String(255) to Text
+    pickup_location = db.Column(db.Text, nullable=False)
+    drop_off_location = db.Column(db.Text, nullable=False)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     courier_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    delivery_status = db.Column(db.String(20), default='pending')  # Updated length to 20 for consistency
+    delivery_status = db.Column(db.String(20), default='pending')
+    shipping_cost = db.Column(db.Float, nullable=False)  # New field
+    distance = db.Column(db.Float, nullable=False)  # New field
 
     def to_dict(self):
         return {
@@ -76,7 +80,9 @@ class Parcel(db.Model):
             'sender_id': self.sender_id,
             'recipient_id': self.recipient_id,
             'courier_id': self.courier_id,
-            'delivery_status': self.delivery_status
+            'delivery_status': self.delivery_status,
+            'shipping_cost': self.shipping_cost,  # New field
+            'distance': self.distance  # New field
         }
 
 # Firebase authentication decorator
@@ -119,7 +125,8 @@ class UserListResource(Resource):
             phone_number=data.get('phone_number'),
             address=data.get('address'),
             role=data['role'],
-            profile_photo_url=data.get('profile_photo_url')
+            profile_photo_url=data.get('profile_photo_url'),
+            account_balance=data.get('account_balance', 0.0)  # New field
         )
         db.session.add(user)
         db.session.commit()
@@ -142,6 +149,7 @@ class UserResource(Resource):
         user.address = data.get('address', user.address)
         user.role = data.get('role', user.role)
         user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
+        user.account_balance = data.get('account_balance', user.account_balance)  # New field
         db.session.commit()
         return jsonify(user.to_dict())
 
@@ -161,6 +169,7 @@ class ParcelListResource(Resource):
     # @firebase_required
     def post(self):
         data = request.json
+
         parcel = Parcel(
             weight=data['weight'],
             length=data['length'],
@@ -172,7 +181,9 @@ class ParcelListResource(Resource):
             sender_id=data['sender_id'],
             recipient_id=data['recipient_id'],
             courier_id=data.get('courier_id'),
-            delivery_status=data.get('delivery_status', 'pending')
+            delivery_status=data.get('delivery_status', 'pending'),
+            shipping_cost=data['shipping_cost'],  # New field
+            distance=data['distance']  # New field
         )
         db.session.add(parcel)
         db.session.commit()
@@ -199,6 +210,8 @@ class ParcelResource(Resource):
         parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
         parcel.courier_id = data.get('courier_id', parcel.courier_id)
         parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
+        parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)  # New field
+        parcel.distance = data.get('distance', parcel.distance)  # New field
         db.session.commit()
         return jsonify(parcel.to_dict())
 
@@ -209,13 +222,11 @@ class ParcelResource(Resource):
         db.session.commit()
         return '', 204
 
-# Register API Resources
+# Register API resources
 api.add_resource(UserListResource, '/users')
 api.add_resource(UserResource, '/users/<int:user_id>')
 api.add_resource(ParcelListResource, '/parcels')
 api.add_resource(ParcelResource, '/parcels/<int:parcel_id>')
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create tables for models if they don't exist
     app.run(debug=True)
