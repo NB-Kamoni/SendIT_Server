@@ -111,7 +111,7 @@ class UserListResource(Resource):
         users = User.query.all()
         return jsonify([user.to_dict() for user in users])
 
-    @firebase_required
+    # @firebase_required
     def post(self):
         data = request.json
         email = request.user.get('email')
