@@ -23,3 +23,4 @@ app.db
 
 # Environment variables
 .env
+firebase-adminsdk.json
