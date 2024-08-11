@@ -7,6 +7,7 @@ from firebase_admin import auth, initialize_app, credentials
 import os
 import base64
 import json
+from models import db, User, Parcel
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -18,7 +19,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your_secret_key')
 
 # Initialize SQLAlchemy, Migrate, and API
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 api = Api(app)
 
@@ -33,67 +34,6 @@ firebase_credentials = json.loads(firebase_credentials_json)
 # Initialize Firebase Admin SDK
 cred = credentials.Certificate(firebase_credentials)
 initialize_app(cred)
-
-# Models
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    firebase_uid = db.Column(db.String(255), unique=True, nullable=False)
-    first_name = db.Column(db.String(255), nullable=False)
-    last_name = db.Column(db.String(255), nullable=False)
-    phone_number = db.Column(db.String(20))
-    address = db.Column(db.Text)
-    role = db.Column(db.String(20))
-    profile_photo_url = db.Column(db.Text)
-    account_balance = db.Column(db.Float, default=0.0, nullable=False)  # New field
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'email': self.email,
-            'firebase_uid': self.firebase_uid,
-            'first_name': self.first_name,
-            'last_name': self.last_name,
-            'phone_number': self.phone_number,
-            'address': self.address,
-            'role': self.role,
-            'profile_photo_url': self.profile_photo_url,
-            'account_balance': self.account_balance  # New field
-        }
-
-class Parcel(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    weight = db.Column(db.Float, nullable=False)
-    length = db.Column(db.Float, nullable=False)
-    width = db.Column(db.Float, nullable=False)
-    height = db.Column(db.Float, nullable=False)
-    value = db.Column(db.Float, nullable=False)
-    pickup_location = db.Column(db.Text, nullable=False)
-    drop_off_location = db.Column(db.Text, nullable=False)
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    courier_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    delivery_status = db.Column(db.String(20), default='pending')
-    shipping_cost = db.Column(db.Float, nullable=False)  # New field
-    distance = db.Column(db.Float, nullable=False)  # New field
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'weight': self.weight,
-            'length': self.length,
-            'width': self.width,
-            'height': self.height,
-            'value': self.value,
-            'pickup_location': self.pickup_location,
-            'drop_off_location': self.drop_off_location,
-            'sender_id': self.sender_id,
-            'recipient_id': self.recipient_id,
-            'courier_id': self.courier_id,
-            'delivery_status': self.delivery_status,
-            'shipping_cost': self.shipping_cost,  # New field
-            'distance': self.distance  # New field
-        }
 
 # Firebase authentication decorator
 def firebase_required(f):
@@ -132,11 +72,16 @@ class UserListResource(Resource):
             firebase_uid=firebase_uid,
             first_name=data.get('first_name'),
             last_name=data.get('last_name'),
+            company_name=data.get('company_name'),
             phone_number=data.get('phone_number'),
             address=data.get('address'),
             role=data['role'],
             profile_photo_url=data.get('profile_photo_url'),
-            account_balance=data.get('account_balance', 0.0)  # New field
+            account_balance=data.get('account_balance', 0.0),
+            gps_location=data.get('gps_location'), 
+            country=data.get('country'), 
+            user_status=data.get('user_status', 'active'),
+            mode_of_transport=data.get('mode_of_transport')  # Added mode_of_transport field
         )
         db.session.add(user)
         db.session.commit()
@@ -155,11 +100,16 @@ class UserResource(Resource):
         user.email = data.get('email', user.email)
         user.first_name = data.get('first_name', user.first_name)
         user.last_name = data.get('last_name', user.last_name)
+        user.company_name = data.get('company_name', user.company_name)
         user.phone_number = data.get('phone_number', user.phone_number)
         user.address = data.get('address', user.address)
         user.role = data.get('role', user.role)
         user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
-        user.account_balance = data.get('account_balance', user.account_balance)  # New field
+        user.account_balance = data.get('account_balance', user.account_balance)
+        user.gps_location = data.get('gps_location', user.gps_location)
+        user.country = data.get('country', user.country)
+        user.user_status = data.get('user_status', user.user_status)
+        user.mode_of_transport = data.get('mode_of_transport', user.mode_of_transport)  # Added mode_of_transport field
         db.session.commit()
         return jsonify(user.to_dict())
 
@@ -192,8 +142,8 @@ class ParcelListResource(Resource):
             recipient_id=data['recipient_id'],
             courier_id=data.get('courier_id'),
             delivery_status=data.get('delivery_status', 'pending'),
-            shipping_cost=data['shipping_cost'],  # New field
-            distance=data['distance']  # New field
+            shipping_cost=data['shipping_cost'],
+            distance=data['distance']
         )
         db.session.add(parcel)
         db.session.commit()
@@ -220,8 +170,8 @@ class ParcelResource(Resource):
         parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
         parcel.courier_id = data.get('courier_id', parcel.courier_id)
         parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
-        parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)  # New field
-        parcel.distance = data.get('distance', parcel.distance)  # New field
+        parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)
+        parcel.distance = data.get('distance', parcel.distance)
         db.session.commit()
         return jsonify(parcel.to_dict())
 

@@ -1,69 +1,73 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData, Enum, ForeignKey, Integer, String, Text, Float, DateTime, Column
-from sqlalchemy.orm import relationship
-from sqlalchemy_serializer import SerializerMixin
-from datetime import datetime
 
-# Define metadata with naming convention
-metadata = MetaData(
-    naming_convention={
-        "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    }
-)
+db = SQLAlchemy()
 
-# Initialize the SQLAlchemy object with custom metadata
-db = SQLAlchemy(metadata=metadata)
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    firebase_uid = db.Column(db.String(120), unique=True, nullable=False)
+    first_name = db.Column(db.String(120))
+    last_name = db.Column(db.String(120))
+    company_name = db.Column(db.String(120))
+    phone_number = db.Column(db.String(20))
+    address = db.Column(db.String(200))
+    role = db.Column(db.String(50), default='client')
+    profile_photo_url = db.Column(db.String(255))
+    account_balance = db.Column(db.Float, default=0.0)
+    gps_location = db.Column(db.String(255))
+    country = db.Column(db.String(100))
+    user_status = db.Column(db.String(50), default='active')
+    mode_of_transport = db.Column(db.String(250))
 
-class User(db.Model, SerializerMixin):
-    __tablename__ = 'users'
-    
-    # Serialization rules to exclude certain fields
-    serialize_rules = ('-sent_parcels', '-received_parcels', '-courier_parcels')
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'firebase_uid': self.firebase_uid,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'company_name': self.company_name,
+            'phone_number': self.phone_number,
+            'address': self.address,
+            'role': self.role,
+            'profile_photo_url': self.profile_photo_url,
+            'account_balance': self.account_balance,
+            'gps_location': self.gps_location,
+            'country': self.country,
+            'user_status': self.user_status,
+            'mode_of_transport': self.mode_of_transport,
+        }
 
-    # Define columns
-    id = Column(Integer, primary_key=True)
-    email = Column(String(255), unique=True, nullable=False)
-    firebase_uid = Column(String(255), unique=True, nullable=False)
-    first_name = Column(String(255))
-    last_name = Column(String(255))
-    phone_number = Column(String(20))
-    address = Column(Text)
-    role = Column(Enum('admin', 'client', 'individual_courier', 'corporate_courier', name='user_roles'), nullable=False)
-    profile_photo_url = Column(Text)
-    account_balance = Column(Float, default=0.0, nullable=False)  # New field
+class Parcel(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    weight = db.Column(db.Float, nullable=False)
+    length = db.Column(db.Float, nullable=False)
+    width = db.Column(db.Float, nullable=False)
+    height = db.Column(db.Float, nullable=False)
+    value = db.Column(db.Float, nullable=False)
+    pickup_location = db.Column(db.String(255), nullable=False)
+    drop_off_location = db.Column(db.String(255), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    courier_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    delivery_status = db.Column(db.String(50), default='pending')
+    shipping_cost = db.Column(db.Float, nullable=False)
+    distance = db.Column(db.Float, nullable=False)
 
-    # Define relationships
-    sent_parcels = relationship('Parcel', backref='sender', foreign_keys='Parcel.sender_id', lazy=True)
-    received_parcels = relationship('Parcel', backref='recipient', foreign_keys='Parcel.recipient_id', lazy=True)
-    courier_parcels = relationship('Parcel', backref='courier', foreign_keys='Parcel.courier_id', lazy=True)
-
-    def __repr__(self):
-        return f'<User(id={self.id}, email={self.email}, role={self.role})>'
-
-class Parcel(db.Model, SerializerMixin):
-    __tablename__ = 'parcels'
-    
-    # Serialization rules to exclude certain fields
-    serialize_rules = ('-sender', '-recipient', '-courier')
-
-    # Define columns
-    id = Column(Integer, primary_key=True)
-    weight = Column(Float, nullable=False)
-    length = Column(Float, nullable=False)
-    width = Column(Float, nullable=False)
-    height = Column(Float, nullable=False)
-    value = Column(Float, nullable=False)
-    pickup_location = Column(Text, nullable=False)
-    drop_off_location = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    delivery_status = Column(Enum('pending', 'in_transit', 'delivered', 'cancelled', name='delivery_statuses'), default='pending', nullable=False)
-    shipping_cost = Column(Float, nullable=False)  # New field
-    distance = Column(Float, nullable=False)  # New field
-
-    # Define foreign keys
-    sender_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    recipient_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    courier_id = Column(Integer, ForeignKey('users.id'), nullable=True)
-
-    def __repr__(self):
-        return f'<Parcel(id={self.id}, status={self.delivery_status}, sender={self.sender_id}, recipient={self.recipient_id})>'
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'weight': self.weight,
+            'length': self.length,
+            'width': self.width,
+            'height': self.height,
+            'value': self.value,
+            'pickup_location': self.pickup_location,
+            'drop_off_location': self.drop_off_location,
+            'sender_id': self.sender_id,
+            'recipient_id': self.recipient_id,
+            'courier_id': self.courier_id,
+            'delivery_status': self.delivery_status,
+            'shipping_cost': self.shipping_cost,
+            'distance': self.distance,
+        }
