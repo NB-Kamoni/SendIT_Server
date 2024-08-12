@@ -72,28 +72,13 @@ class UserResource(Resource):
 
     # @firebase_required
     def post(self, user_id=None):
+        if user_id:
+            return make_response(jsonify({'message': 'User ID should not be provided for POST'}), 400)
+
         try:
-            if user_id:
-                return make_response(jsonify({'message': 'User ID should not be provided for POST'}), 400)
-
             data = request.json
-            # email = request.user.get('email')
-            # firebase_uid = request.user.get('uid')
-
-            # if not email or not firebase_uid:
-            #     return make_response(jsonify({'message': 'Missing required fields: email or firebase_uid'}), 400)
-
-            # Check if user already exists
-            # existing_user = User.query.filter_by(firebase_uid=firebase_uid).first()
-            # if existing_user:
-            #     return make_response(jsonify({'message': 'User with this Firebase UID already exists'}), 400)
 
             user = User(
-                ### when using user.get
-                # email=email,
-                # firebase_uid=firebase_uid,
-
-                ### when getting from 
                 email=data.get('email', ''),
                 firebase_uid=data.get('firebase_uid', ''),
                 first_name=data.get('first_name', ''),
@@ -113,6 +98,7 @@ class UserResource(Resource):
             db.session.commit()
             return jsonify(user.to_dict()), 201
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error creating user: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
@@ -137,6 +123,7 @@ class UserResource(Resource):
             db.session.commit()
             return jsonify(user.to_dict())
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error updating user: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
@@ -148,6 +135,7 @@ class UserResource(Resource):
             db.session.commit()
             return '', 204
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error deleting user: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
@@ -167,10 +155,10 @@ class ParcelResource(Resource):
 
     # @firebase_required
     def post(self, parcel_id=None):
-        try:
-            if parcel_id:
-                return make_response(jsonify({'message': 'Parcel ID should not be provided for POST'}), 400)
+        if parcel_id:
+            return make_response(jsonify({'message': 'Parcel ID should not be provided for POST'}), 400)
 
+        try:
             data = request.json
 
             parcel = Parcel(
@@ -192,6 +180,7 @@ class ParcelResource(Resource):
             db.session.commit()
             return jsonify(parcel.to_dict()), 201
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error creating parcel: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
@@ -216,6 +205,7 @@ class ParcelResource(Resource):
             db.session.commit()
             return jsonify(parcel.to_dict())
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error updating parcel: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
@@ -227,6 +217,7 @@ class ParcelResource(Resource):
             db.session.commit()
             return '', 204
         except Exception as e:
+            db.session.rollback()  # Rollback on error
             app.logger.error(f"Error deleting parcel: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
