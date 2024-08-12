@@ -54,6 +54,10 @@ class Parcel(db.Model):
     shipping_cost = db.Column(db.Float, nullable=False)
     distance = db.Column(db.Float, nullable=False)
 
+    sender = db.relationship('User', foreign_keys=[sender_id])
+    recipient = db.relationship('User', foreign_keys=[recipient_id])
+    courier = db.relationship('User', foreign_keys=[courier_id])
+
     def to_dict(self):
         return {
             'id': self.id,

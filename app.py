@@ -47,6 +47,7 @@ def firebase_required(f):
             decoded_token = auth.verify_id_token(token)
             request.user = decoded_token
         except Exception as e:
+            app.logger.error(f"Firebase authentication error: {e}")
             return make_response(jsonify({'message': 'Invalid token', 'error': str(e)}), 401)
         
         return f(*args, **kwargs)
@@ -55,138 +56,183 @@ def firebase_required(f):
     return decorator
 
 # API Resources
-class UserListResource(Resource):
-    # @firebase_required
-    def get(self):
-        users = User.query.all()
-        return jsonify([user.to_dict() for user in users])
-
-    # @firebase_required
-    def post(self):
-        data = request.json
-        email = request.user.get('email')
-        firebase_uid = request.user.get('uid')
-
-        user = User(
-            email=email,
-            firebase_uid=firebase_uid,
-            first_name=data.get('first_name'),
-            last_name=data.get('last_name'),
-            company_name=data.get('company_name'),
-            phone_number=data.get('phone_number'),
-            address=data.get('address'),
-            role=data['role'],
-            profile_photo_url=data.get('profile_photo_url'),
-            account_balance=data.get('account_balance', 0.0),
-            gps_location=data.get('gps_location'), 
-            country=data.get('country'), 
-            user_status=data.get('user_status', 'active'),
-            mode_of_transport=data.get('mode_of_transport')  # Added mode_of_transport field
-        )
-        db.session.add(user)
-        db.session.commit()
-        return jsonify(user.to_dict()), 201
-
 class UserResource(Resource):
     # @firebase_required
-    def get(self, user_id):
-        user = User.query.get_or_404(user_id)
-        return jsonify(user.to_dict())
+    def get(self, user_id=None):
+        try:
+            if user_id:
+                user = User.query.get_or_404(user_id)
+                return jsonify(user.to_dict())
+            else:
+                users = User.query.all()
+                return jsonify([user.to_dict() for user in users])
+        except Exception as e:
+            app.logger.error(f"Error fetching users: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
+
+    # @firebase_required
+    def post(self, user_id=None):
+        try:
+            if user_id:
+                return make_response(jsonify({'message': 'User ID should not be provided for POST'}), 400)
+
+            data = request.json
+            # email = request.user.get('email')
+            # firebase_uid = request.user.get('uid')
+
+            # if not email or not firebase_uid:
+            #     return make_response(jsonify({'message': 'Missing required fields: email or firebase_uid'}), 400)
+
+            # Check if user already exists
+            # existing_user = User.query.filter_by(firebase_uid=firebase_uid).first()
+            # if existing_user:
+            #     return make_response(jsonify({'message': 'User with this Firebase UID already exists'}), 400)
+
+            user = User(
+                ### when using user.get
+                # email=email,
+                # firebase_uid=firebase_uid,
+
+                ### when getting from 
+                email=data.get('email', ''),
+                firebase_uid=data.get('firebase_uid', ''),
+                first_name=data.get('first_name', ''),
+                last_name=data.get('last_name', ''),
+                company_name=data.get('company_name', ''),
+                phone_number=data.get('phone_number', ''),
+                address=data.get('address', ''),
+                role=data.get('role', ''),
+                profile_photo_url=data.get('profile_photo_url', ''),
+                account_balance=data.get('account_balance', 0.0),
+                gps_location=data.get('gps_location', None),
+                country=data.get('country', ''),
+                user_status=data.get('user_status', 'active'),
+                mode_of_transport=data.get('mode_of_transport', '')
+            )
+            db.session.add(user)
+            db.session.commit()
+            return jsonify(user.to_dict()), 201
+        except Exception as e:
+            app.logger.error(f"Error creating user: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
     # @firebase_required
     def put(self, user_id):
-        user = User.query.get_or_404(user_id)
-        data = request.json
-        user.email = data.get('email', user.email)
-        user.first_name = data.get('first_name', user.first_name)
-        user.last_name = data.get('last_name', user.last_name)
-        user.company_name = data.get('company_name', user.company_name)
-        user.phone_number = data.get('phone_number', user.phone_number)
-        user.address = data.get('address', user.address)
-        user.role = data.get('role', user.role)
-        user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
-        user.account_balance = data.get('account_balance', user.account_balance)
-        user.gps_location = data.get('gps_location', user.gps_location)
-        user.country = data.get('country', user.country)
-        user.user_status = data.get('user_status', user.user_status)
-        user.mode_of_transport = data.get('mode_of_transport', user.mode_of_transport)  # Added mode_of_transport field
-        db.session.commit()
-        return jsonify(user.to_dict())
+        try:
+            user = User.query.get_or_404(user_id)
+            data = request.json
+            user.email = data.get('email', user.email)
+            user.first_name = data.get('first_name', user.first_name)
+            user.last_name = data.get('last_name', user.last_name)
+            user.company_name = data.get('company_name', user.company_name)
+            user.phone_number = data.get('phone_number', user.phone_number)
+            user.address = data.get('address', user.address)
+            user.role = data.get('role', user.role)
+            user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
+            user.account_balance = data.get('account_balance', user.account_balance)
+            user.gps_location = data.get('gps_location', user.gps_location)
+            user.country = data.get('country', user.country)
+            user.user_status = data.get('user_status', user.user_status)
+            user.mode_of_transport = data.get('mode_of_transport', user.mode_of_transport)
+            db.session.commit()
+            return jsonify(user.to_dict())
+        except Exception as e:
+            app.logger.error(f"Error updating user: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
     # @firebase_required
     def delete(self, user_id):
-        user = User.query.get_or_404(user_id)
-        db.session.delete(user)
-        db.session.commit()
-        return '', 204
-
-class ParcelListResource(Resource):
-    # @firebase_required
-    def get(self):
-        parcels = Parcel.query.all()
-        return jsonify([parcel.to_dict() for parcel in parcels])
-
-    # @firebase_required
-    def post(self):
-        data = request.json
-
-        parcel = Parcel(
-            weight=data['weight'],
-            length=data['length'],
-            width=data['width'],
-            height=data['height'],
-            value=data['value'],
-            pickup_location=data['pickup_location'],
-            drop_off_location=data['drop_off_location'],
-            sender_id=data['sender_id'],
-            recipient_id=data['recipient_id'],
-            courier_id=data.get('courier_id'),
-            delivery_status=data.get('delivery_status', 'pending'),
-            shipping_cost=data['shipping_cost'],
-            distance=data['distance']
-        )
-        db.session.add(parcel)
-        db.session.commit()
-        return jsonify(parcel.to_dict()), 201
+        try:
+            user = User.query.get_or_404(user_id)
+            db.session.delete(user)
+            db.session.commit()
+            return '', 204
+        except Exception as e:
+            app.logger.error(f"Error deleting user: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
 class ParcelResource(Resource):
     # @firebase_required
-    def get(self, parcel_id):
-        parcel = Parcel.query.get_or_404(parcel_id)
-        return jsonify(parcel.to_dict())
+    def get(self, parcel_id=None):
+        try:
+            if parcel_id:
+                parcel = Parcel.query.get_or_404(parcel_id)
+                return jsonify(parcel.to_dict())
+            else:
+                parcels = Parcel.query.all()
+                return jsonify([parcel.to_dict() for parcel in parcels])
+        except Exception as e:
+            app.logger.error(f"Error fetching parcels: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
+
+    # @firebase_required
+    def post(self, parcel_id=None):
+        try:
+            if parcel_id:
+                return make_response(jsonify({'message': 'Parcel ID should not be provided for POST'}), 400)
+
+            data = request.json
+
+            parcel = Parcel(
+                weight=data.get('weight', 0),
+                length=data.get('length', 0),
+                width=data.get('width', 0),
+                height=data.get('height', 0),
+                value=data.get('value', 0),
+                pickup_location=data.get('pickup_location', ''),
+                drop_off_location=data.get('drop_off_location', ''),
+                sender_id=data.get('sender_id', None),
+                recipient_id=data.get('recipient_id', None),
+                courier_id=data.get('courier_id', None),
+                delivery_status=data.get('delivery_status', 'pending'),
+                shipping_cost=data.get('shipping_cost', 0),
+                distance=data.get('distance', 0)
+            )
+            db.session.add(parcel)
+            db.session.commit()
+            return jsonify(parcel.to_dict()), 201
+        except Exception as e:
+            app.logger.error(f"Error creating parcel: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
     # @firebase_required
     def put(self, parcel_id):
-        parcel = Parcel.query.get_or_404(parcel_id)
-        data = request.json
-        parcel.weight = data.get('weight', parcel.weight)
-        parcel.length = data.get('length', parcel.length)
-        parcel.width = data.get('width', parcel.width)
-        parcel.height = data.get('height', parcel.height)
-        parcel.value = data.get('value', parcel.value)
-        parcel.pickup_location = data.get('pickup_location', parcel.pickup_location)
-        parcel.drop_off_location = data.get('drop_off_location', parcel.drop_off_location)
-        parcel.sender_id = data.get('sender_id', parcel.sender_id)
-        parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
-        parcel.courier_id = data.get('courier_id', parcel.courier_id)
-        parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
-        parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)
-        parcel.distance = data.get('distance', parcel.distance)
-        db.session.commit()
-        return jsonify(parcel.to_dict())
+        try:
+            parcel = Parcel.query.get_or_404(parcel_id)
+            data = request.json
+            parcel.weight = data.get('weight', parcel.weight)
+            parcel.length = data.get('length', parcel.length)
+            parcel.width = data.get('width', parcel.width)
+            parcel.height = data.get('height', parcel.height)
+            parcel.value = data.get('value', parcel.value)
+            parcel.pickup_location = data.get('pickup_location', parcel.pickup_location)
+            parcel.drop_off_location = data.get('drop_off_location', parcel.drop_off_location)
+            parcel.sender_id = data.get('sender_id', parcel.sender_id)
+            parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
+            parcel.courier_id = data.get('courier_id', parcel.courier_id)
+            parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
+            parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)
+            parcel.distance = data.get('distance', parcel.distance)
+            db.session.commit()
+            return jsonify(parcel.to_dict())
+        except Exception as e:
+            app.logger.error(f"Error updating parcel: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
     # @firebase_required
     def delete(self, parcel_id):
-        parcel = Parcel.query.get_or_404(parcel_id)
-        db.session.delete(parcel)
-        db.session.commit()
-        return '', 204
+        try:
+            parcel = Parcel.query.get_or_404(parcel_id)
+            db.session.delete(parcel)
+            db.session.commit()
+            return '', 204
+        except Exception as e:
+            app.logger.error(f"Error deleting parcel: {e}")
+            return make_response(jsonify({'message': 'Internal server error'}), 500)
 
 # Register API resources
-api.add_resource(UserListResource, '/users')
-api.add_resource(UserResource, '/users/<int:user_id>')
-api.add_resource(ParcelListResource, '/parcels')
-api.add_resource(ParcelResource, '/parcels/<int:parcel_id>')
+api.add_resource(UserResource, '/users', '/users/<int:user_id>')
+api.add_resource(ParcelResource, '/parcels', '/parcels/<int:parcel_id>')
 
 # Run the app
 if __name__ == '__main__':
