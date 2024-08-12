@@ -57,10 +57,15 @@ def firebase_required(f):
 
 # API Resources
 class UserResource(Resource):
-    # @firebase_required
-    def get(self, user_id=None):
+    def get(self, user_id=None, firebase_uid=None):
         try:
-            if user_id:
+            if firebase_uid:
+                user = User.query.filter_by(firebase_uid=firebase_uid).first()
+                if user:
+                    return jsonify(user.to_dict())
+                else:
+                    return make_response(jsonify({'message': 'User not found'}), 404)
+            elif user_id:
                 user = User.query.get_or_404(user_id)
                 return jsonify(user.to_dict())
             else:
@@ -69,6 +74,8 @@ class UserResource(Resource):
         except Exception as e:
             app.logger.error(f"Error fetching users: {e}")
             return make_response(jsonify({'message': 'Internal server error'}), 500)
+
+        
 
     # @firebase_required
     def post(self, user_id=None):
@@ -222,8 +229,10 @@ class ParcelResource(Resource):
             return make_response(jsonify({'message': 'Internal server error'}), 500)
 
 # Register API resources
-api.add_resource(UserResource, '/users', '/users/<int:user_id>')
+# api.add_resource(UserResource, '/users', '/users/<int:user_id>')
 api.add_resource(ParcelResource, '/parcels', '/parcels/<int:parcel_id>')
+api.add_resource(UserResource, '/users', '/users/<int:user_id>', '/users/role/<string:firebase_uid>')
+
 
 # Run the app
 if __name__ == '__main__':
