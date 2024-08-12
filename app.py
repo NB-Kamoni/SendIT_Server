@@ -106,7 +106,7 @@ class UserResource(Resource):
                 account_balance=data.get('account_balance', 0.0),
                 gps_location=data.get('gps_location', None),
                 country=data.get('country', ''),
-                user_status=data.get('user_status', 'active'),
+                user_status=data.get('user_status', ''),
                 mode_of_transport=data.get('mode_of_transport', '')
             )
             db.session.add(user)
