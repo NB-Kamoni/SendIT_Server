@@ -1,4 +1,4 @@
-# Global Learn School Management System - Backend Server
+# SendIT - Backend Server
 
 Welcome to the backend server repository for SendIT. This server handles database operations and provides endpoints for managing parcel orders, allocation and user management
 
