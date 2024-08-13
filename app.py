@@ -43,7 +43,7 @@ api = Api(app)
 
 #--------------------------------------------
 # Admin Endpoints
-class CreateUser(Resource):
+class CreateUserResource(Resource):
     def post(self):
         data = request.get_json()
         email = data.get('email')
@@ -72,7 +72,7 @@ class CreateUser(Resource):
             db.session.rollback()
             return jsonify({'error': str(e)}), 400
         
-class UpdateUserProfile(Resource):
+class UpdateUserProfileResource(Resource):
     def put(self, user_id):
         data = request.get_json()
 
@@ -192,6 +192,9 @@ api.add_resource(CreateParcelResource, '/client/parcels')
 api.add_resource(ParcelTrackingResource, '/client/parcels/track/<string:tracking_number>')
 
 # updating user profile
+api.add_resource(UpdateUserProfileResource, '/user/profiles')
+# creating user
+api.add_resource(CreateUserResource, '/users')
 
 #--------------------------------------------
 # Run the app
