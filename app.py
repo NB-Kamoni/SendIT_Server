@@ -6,6 +6,9 @@ import os
 from models import db, User, Parcel
 
 app = Flask(__name__)
+
+CORS(app)
+
 # --------------------------configuration--------------------------------------
 # Load appropriate configuration based on FLASK_ENV
 if os.getenv('FLASK_ENV') == 'production':
@@ -41,6 +44,8 @@ with app.app_context():
 
 migrate = Migrate(app, db)
 api = Api(app)
+
+
 
 #--------------------------------------------
 # Admin Endpoints
