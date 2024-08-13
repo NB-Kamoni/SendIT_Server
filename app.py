@@ -1,239 +1,201 @@
-from flask import Flask, jsonify, request, make_response
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, jsonify, request, abort
 from flask_restful import Api, Resource
 from flask_migrate import Migrate
-from flask_cors import CORS
-from firebase_admin import auth, initialize_app, credentials
 import os
-import base64
-import json
 from models import db, User, Parcel
 
-# Initialize the Flask application
 app = Flask(__name__)
-CORS(app)
+# --------------------------configuration--------------------------------------
+# Load appropriate configuration based on FLASK_ENV
+if os.getenv('FLASK_ENV') == 'production':
+    app.config.from_object('config.ProductionConfig')
+elif os.getenv('FLASK_ENV') == 'testing':
+    app.config.from_object('config.TestingConfig')
+else:
+    app.config.from_object('config.DevelopmentConfig')
 
-# Load configuration from environment variables or set defaults
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///sendit.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your_secret_key')
+# Configure SQLAlchemy database URI based on environment variables
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Initialize SQLAlchemy, Migrate, and API
+# Set up database URI based on environment (use DB_EXTERNAL_URL by default)
+if os.getenv('FLASK_ENV') == 'production':
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_INTERNAL_URL")
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DB_EXTERNAL_URL")
+
+# Set the Flask app secret key from environment variable
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+
+
+# db = SQLAlchemy(app)
+
+# Initialize SQLAlchemy with the Flask app
 db.init_app(app)
+
+# Create the app context
+with app.app_context():
+    # Create the database tables if they don't exist
+    db.create_all()
+
 migrate = Migrate(app, db)
 api = Api(app)
 
-# Decode Firebase credentials from environment variable
-firebase_credentials_base64 = os.getenv('FIREBASE_CREDENTIALS_BASE64')
-if not firebase_credentials_base64:
-    raise Exception("Firebase credentials not found in environment variables")
+#--------------------------------------------
+# Admin Endpoints
+class CreateUser(Resource):
+    def post(self):
+        data = request.get_json()
+        email = data.get('email')
+        role = data.get('role')
+        firebase_uid = data.get('firebase_uid')
+        user_status = data.get('status', 'active')
 
-firebase_credentials_json = base64.b64decode(firebase_credentials_base64)
-firebase_credentials = json.loads(firebase_credentials_json)
+        if not email or not role or not firebase_uid:
+            return jsonify({'error': 'Email, role, and firebase_uid are required'}), 400
 
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate(firebase_credentials)
-initialize_app(cred)
-
-# Firebase authentication decorator
-def firebase_required(f):
-    def decorator(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return make_response(jsonify({'message': 'Missing or invalid authorization header'}), 401)
-        
-        token = auth_header.split(' ')[1]
-        try:
-            decoded_token = auth.verify_id_token(token)
-            request.user = decoded_token
-        except Exception as e:
-            app.logger.error(f"Firebase authentication error: {e}")
-            return make_response(jsonify({'message': 'Invalid token', 'error': str(e)}), 401)
-        
-        return f(*args, **kwargs)
-    
-    decorator.__name__ = f.__name__
-    return decorator
-
-# API Resources
-class UserResource(Resource):
-    def get(self, user_id=None, firebase_uid=None):
-        try:
-            if firebase_uid:
-                user = User.query.filter_by(firebase_uid=firebase_uid).first()
-                if user:
-                    return jsonify(user.to_dict())
-                else:
-                    return make_response(jsonify({'message': 'User not found'}), 404)
-            elif user_id:
-                user = User.query.get_or_404(user_id)
-                return jsonify(user.to_dict())
-            else:
-                users = User.query.all()
-                return jsonify([user.to_dict() for user in users])
-        except Exception as e:
-            app.logger.error(f"Error fetching users: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
-
-        
-
-    # @firebase_required
-    def post(self, user_id=None):
-        if user_id:
-            return make_response(jsonify({'message': 'User ID should not be provided for POST'}), 400)
+        # Check if the user already exists
+        if User.query.filter_by(firebase_uid=firebase_uid).first():
+            return jsonify({'error': 'User with this Firebase UID already exists'}), 400
 
         try:
-            data = request.json
-
             user = User(
-                email=data.get('email', ''),
-                firebase_uid=data.get('firebase_uid', ''),
-                first_name=data.get('first_name', ''),
-                last_name=data.get('last_name', ''),
-                company_name=data.get('company_name', ''),
-                phone_number=data.get('phone_number', ''),
-                address=data.get('address', ''),
-                role=data.get('role', ''),
-                profile_photo_url=data.get('profile_photo_url', ''),
-                account_balance=data.get('account_balance', 0.0),
-                gps_location=data.get('gps_location', None),
-                country=data.get('country', ''),
-                user_status=data.get('user_status', ''),
-                mode_of_transport=data.get('mode_of_transport', '')
+                email=email,
+                role=role,
+                firebase_uid=firebase_uid,
+                user_status=user_status
             )
             db.session.add(user)
             db.session.commit()
-            return jsonify(user.to_dict()), 201
+            return jsonify({'message': 'User created successfully', 'user': user.to_dict()}), 201
         except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error creating user: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
-
-    # @firebase_required
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 400
+        
+class UpdateUserProfile(Resource):
     def put(self, user_id):
+        data = request.get_json()
+
+        # Fetch the user by ID
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Update user attributes if they are provided in the request data
+        user.first_name = data.get('first_name', user.first_name)
+        user.last_name = data.get('last_name', user.last_name)
+        user.company_name = data.get('company_name', user.company_name)
+        user.phone_number = data.get('phone_number', user.phone_number)
+        user.address = data.get('address', user.address)
+        user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
+        user.account_balance = data.get('account_balance', user.account_balance)
+        user.gps_location = data.get('gps_location', user.gps_location)
+        user.country = data.get('country', user.country)
+        user.mode_of_transport = data.get('mode_of_transport', user.mode_of_transport)
+
         try:
-            user = User.query.get_or_404(user_id)
-            data = request.json
-            user.email = data.get('email', user.email)
-            user.first_name = data.get('first_name', user.first_name)
-            user.last_name = data.get('last_name', user.last_name)
-            user.company_name = data.get('company_name', user.company_name)
-            user.phone_number = data.get('phone_number', user.phone_number)
-            user.address = data.get('address', user.address)
-            user.role = data.get('role', user.role)
-            user.profile_photo_url = data.get('profile_photo_url', user.profile_photo_url)
-            user.account_balance = data.get('account_balance', user.account_balance)
-            user.gps_location = data.get('gps_location', user.gps_location)
-            user.country = data.get('country', user.country)
-            user.user_status = data.get('user_status', user.user_status)
-            user.mode_of_transport = data.get('mode_of_transport', user.mode_of_transport)
             db.session.commit()
-            return jsonify(user.to_dict())
+            return jsonify({'message': 'User profile updated successfully', 'user': user.to_dict()}), 200
         except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error updating user: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 400
 
-    # @firebase_required
-    def delete(self, user_id):
+class UserListResource(Resource):
+    def get(self):
+        """Admin: Get a list of all users"""
+        users = User.get_all_users()
+        return jsonify([user.to_dict() for user in users])
+
+class ParcelListResource(Resource):
+    def get(self):
+        """Admin: Get a list of all parcels with details"""
+        parcels = Parcel.get_parcels_with_details()
+        return jsonify([parcel.to_dict() for parcel in parcels])
+
+class CourierListResource(Resource):
+    def get(self, status=None):
+        """Admin: Get a list of couriers filtered by status"""
+        if status:
+            couriers = User.get_couriers_by_status(status)
+        else:
+            couriers = User.get_users_by_role('individual_courier') + User.get_users_by_role('corporate_courier')
+        return jsonify([courier.to_dict() for courier in couriers])
+
+class ParcelSearchByTrackingResource(Resource):
+    def get(self, tracking_number):
+        """Admin: Search parcels by tracking number"""
+        parcel = Parcel.get_parcel_by_tracking_number(tracking_number)
+        if not parcel:
+            abort(404, description="Parcel not found")
+        return jsonify(parcel.to_dict())
+
+class UserSearchByStatusResource(Resource):
+    def get(self, status):
+        """Admin: Get a list of users filtered by status"""
+        users = User.get_users_by_status(status)
+        return jsonify([user.to_dict() for user in users])
+
+#--------------------------------------------
+# Client Endpoints
+class ClientParcelListResource(Resource):
+    def get(self, client_id):
+        """Client: Get all parcels where the client is the sender or recipient"""
+        parcels = Parcel.get_parcels_by_client(client_id)
+        return jsonify([parcel.to_dict() for parcel in parcels])
+
+class CreateParcelResource(Resource):
+    def post(self):
+        """Client: Create a new parcel"""
+        data = request.json
         try:
-            user = User.query.get_or_404(user_id)
-            db.session.delete(user)
-            db.session.commit()
-            return '', 204
-        except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error deleting user: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
-
-class ParcelResource(Resource):
-    # @firebase_required
-    def get(self, parcel_id=None):
-        try:
-            if parcel_id:
-                parcel = Parcel.query.get_or_404(parcel_id)
-                return jsonify(parcel.to_dict())
-            else:
-                parcels = Parcel.query.all()
-                return jsonify([parcel.to_dict() for parcel in parcels])
-        except Exception as e:
-            app.logger.error(f"Error fetching parcels: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
-
-    # @firebase_required
-    def post(self, parcel_id=None):
-        if parcel_id:
-            return make_response(jsonify({'message': 'Parcel ID should not be provided for POST'}), 400)
-
-        try:
-            data = request.json
-
             parcel = Parcel(
-                weight=data.get('weight', 0),
-                length=data.get('length', 0),
-                width=data.get('width', 0),
-                height=data.get('height', 0),
-                value=data.get('value', 0),
-                pickup_location=data.get('pickup_location', ''),
-                drop_off_location=data.get('drop_off_location', ''),
-                sender_id=data.get('sender_id', None),
-                recipient_id=data.get('recipient_id', None),
-                courier_id=data.get('courier_id', None),
-                delivery_status=data.get('delivery_status', 'pending'),
-                shipping_cost=data.get('shipping_cost', 0),
-                distance=data.get('distance', 0)
+                weight=data['weight'],
+                length=data['length'],
+                width=data['width'],
+                height=data['height'],
+                value=data['value'],
+                pickup_location=data['pickup_location'],
+                drop_off_location=data['drop_off_location'],
+                sender_id=data['sender_id'],
+                recipient_id=data['recipient_id'],
+                courier_id=data.get('courier_id'),  # Optional
+                shipping_cost=data['shipping_cost'],
+                distance=data['distance']
             )
             db.session.add(parcel)
             db.session.commit()
             return jsonify(parcel.to_dict()), 201
         except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error creating parcel: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
+            db.session.rollback()
+            abort(400, description=f"Error creating parcel: {str(e)}")
 
-    # @firebase_required
-    def put(self, parcel_id):
-        try:
-            parcel = Parcel.query.get_or_404(parcel_id)
-            data = request.json
-            parcel.weight = data.get('weight', parcel.weight)
-            parcel.length = data.get('length', parcel.length)
-            parcel.width = data.get('width', parcel.width)
-            parcel.height = data.get('height', parcel.height)
-            parcel.value = data.get('value', parcel.value)
-            parcel.pickup_location = data.get('pickup_location', parcel.pickup_location)
-            parcel.drop_off_location = data.get('drop_off_location', parcel.drop_off_location)
-            parcel.sender_id = data.get('sender_id', parcel.sender_id)
-            parcel.recipient_id = data.get('recipient_id', parcel.recipient_id)
-            parcel.courier_id = data.get('courier_id', parcel.courier_id)
-            parcel.delivery_status = data.get('delivery_status', parcel.delivery_status)
-            parcel.shipping_cost = data.get('shipping_cost', parcel.shipping_cost)
-            parcel.distance = data.get('distance', parcel.distance)
-            db.session.commit()
-            return jsonify(parcel.to_dict())
-        except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error updating parcel: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
+class ParcelTrackingResource(Resource):
+    def get(self, tracking_number):
+        """Client: Get parcel details by tracking number"""
+        parcel = Parcel.get_parcel_by_tracking_number(tracking_number)
+        if not parcel:
+            abort(404, description="Parcel not found")
+        return jsonify(parcel.to_dict())
 
-    # @firebase_required
-    def delete(self, parcel_id):
-        try:
-            parcel = Parcel.query.get_or_404(parcel_id)
-            db.session.delete(parcel)
-            db.session.commit()
-            return '', 204
-        except Exception as e:
-            db.session.rollback()  # Rollback on error
-            app.logger.error(f"Error deleting parcel: {e}")
-            return make_response(jsonify({'message': 'Internal server error'}), 500)
+#--------------------------------------------
+# API Routes
+# Admin routes
+api.add_resource(UserListResource, '/admin/users')
+api.add_resource(ParcelListResource, '/admin/parcels')
+api.add_resource(CourierListResource, '/admin/couriers', '/admin/couriers/<string:status>')
+api.add_resource(ParcelSearchByTrackingResource, '/admin/parcels/track/<string:tracking_number>')
+api.add_resource(UserSearchByStatusResource, '/admin/users/status/<string:status>')
 
-# Register API resources
-# api.add_resource(UserResource, '/users', '/users/<int:user_id>')
-api.add_resource(ParcelResource, '/parcels', '/parcels/<int:parcel_id>')
-api.add_resource(UserResource, '/users', '/users/<int:user_id>', '/users/role/<string:firebase_uid>')
+# Client routes
+api.add_resource(ClientParcelListResource, '/client/<int:client_id>/parcels')
+api.add_resource(CreateParcelResource, '/client/parcels')
+api.add_resource(ParcelTrackingResource, '/client/parcels/track/<string:tracking_number>')
 
+# updating user profile
 
+#--------------------------------------------
 # Run the app
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
