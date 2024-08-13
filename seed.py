@@ -63,7 +63,7 @@ def seed_parcels():
                 'drop_off_location': 'Location B',
                 'shipping_cost': random.uniform(10, 50),
                 'distance': random.uniform(5, 20),
-                'delivery_status': 'pending',
+                'delivery_status': 'delivered',
                 'created_at': now,
                 'updated_at': now
             },
@@ -79,7 +79,8 @@ def seed_parcels():
                 'distance': random.uniform(5, 20),
                 'delivery_status': 'in_progress',
                 'created_at': now - one_day,
-                'updated_at': now
+                'updated_at': now,
+                
             }
         ]
 

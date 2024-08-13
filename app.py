@@ -78,6 +78,18 @@ class CreateUserResource(Resource):
             db.session.rollback()
             return jsonify({'error': str(e)}), 400
         
+
+class SearchUserByIdResource(Resource):
+    def get(self, user_id):
+        # Attempt to find the user by ID
+        user = User.query.get(user_id)
+        
+        if user:
+            return jsonify({'user': user.to_dict()}), 200
+        else:
+            return jsonify({'error': 'User not found'}), 404
+
+        
 class UpdateUserProfileResource(Resource):
     def put(self, user_id):
         data = request.get_json()
@@ -201,6 +213,11 @@ api.add_resource(ParcelTrackingResource, '/client/parcels/track/<string:tracking
 api.add_resource(UpdateUserProfileResource, '/user/profiles')
 # creating user
 api.add_resource(CreateUserResource, '/users')
+
+#Search user by id
+api.add_resource(SearchUserByIdResource, '/users/<int:user_id>')
+
+
 
 #--------------------------------------------
 # Run the app
