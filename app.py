@@ -81,14 +81,11 @@ class CreateUserResource(Resource):
 
 class SearchUserByIdResource(Resource):
     def get(self, user_id):
-        # Attempt to find the user by ID
+        """Search user by user ID"""
         user = User.query.get(user_id)
-        
-        if user:
-            return jsonify({'user': user.to_dict()}), 200
-        else:
-            return jsonify({'error': 'User not found'}), 404
-
+        if not user:
+            abort(404, description="User not found")
+        return jsonify(user.to_dict())
         
 class UpdateUserProfileResource(Resource):
     def put(self, user_id):
