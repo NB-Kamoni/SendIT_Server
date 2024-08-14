@@ -108,6 +108,7 @@ class User(db.Model, SerializerMixin):
     def get_users_by_role(role):
         """Return a list of users based on their role"""
         return User.query.filter_by(role=role).all()
+   
 
     @staticmethod
     def get_all_users():

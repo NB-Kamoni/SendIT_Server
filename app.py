@@ -89,8 +89,8 @@ class SearchUserByIdResource(Resource):
 
 class SearchUserByEmailResource(Resource):
     def get(self, email):
-        """Search user by user email"""
-        user = User.query.get(email)
+        """Search user by email"""
+        user = User.query.filter_by(email=email).first()
         if not user:
             abort(404, description="User not found")
         return jsonify(user.to_dict())
@@ -223,7 +223,7 @@ api.add_resource(CreateUserResource, '/users')
 api.add_resource(SearchUserByIdResource, '/users/<int:user_id>')
 
 #Search user by email
-api.add_resource(SearchUserByEmailResource, '/users/<string:email>')
+api.add_resource(SearchUserByEmailResource, '/users/email/<string:email>')
 
 
 #--------------------------------------------
