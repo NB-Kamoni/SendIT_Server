@@ -86,6 +86,14 @@ class SearchUserByIdResource(Resource):
         if not user:
             abort(404, description="User not found")
         return jsonify(user.to_dict())
+
+class SearchUserByEmailResource(Resource):
+    def get(self, email):
+        """Search user by user email"""
+        user = User.query.get(email)
+        if not user:
+            abort(404, description="User not found")
+        return jsonify(user.to_dict())
         
 class UpdateUserProfileResource(Resource):
     def put(self, user_id):
@@ -214,6 +222,8 @@ api.add_resource(CreateUserResource, '/users')
 #Search user by id
 api.add_resource(SearchUserByIdResource, '/users/<int:user_id>')
 
+#Search user by email
+api.add_resource(SearchUserByEmailResource, '/users/<string:email>')
 
 
 #--------------------------------------------
