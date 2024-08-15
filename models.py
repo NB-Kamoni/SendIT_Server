@@ -2,7 +2,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData, func
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy_serializer import SerializerMixin
-import uuid
 from sqlalchemy.orm import aliased
 
 # Define a naming convention for the metadata
@@ -128,7 +127,7 @@ class Parcel(db.Model, SerializerMixin):
     serialize_rules = ('-sender_user', '-recipient_user', '-courier_user')
 
     id = db.Column(db.Integer, primary_key=True)
-    tracking_number = db.Column(db.String(50), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    tracking_number = db.Column(db.String(50), unique=True, nullable=False)
     weight = db.Column(db.Float, nullable=False)
     length = db.Column(db.Float, nullable=False)
     width = db.Column(db.Float, nullable=False)

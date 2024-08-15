@@ -168,51 +168,61 @@ class ClientParcelListResource(Resource):
 
 class CreateParcelResource(Resource):
     def post(self):
-        """Client: Create a new parcel"""
         data = request.get_json()
-        required_fields = ['weight', 'length', 'width', 'height', 'value', 'pickup_location', 'drop_off_location', 'recipient_email', 'shipping_cost', 'distance']
 
-        # Check for missing fields
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'{field} is required'}), 400
+        # Extract required fields from the request data
+        tracking_number = data.get('tracking_number')
+        weight = data.get('weight')
+        length = data.get('length')
+        width = data.get('width')
+        height = data.get('height')
+        value = data.get('value')
+        pickup_location = data.get('pickup_location')
+        drop_off_location = data.get('drop_off_location')
+        sender_id = data.get('sender_id')
+        recipient_id = data.get('recipient_id')
+        courier_id = data.get('courier_id')
+        shipping_cost = data.get('shipping_cost')
+        distance = data.get('distance')
 
-        # Get the sender ID from the request context or token (assuming authenticated user)
-        # Replace this with your authentication method to retrieve the current user ID
-        sender_id = data.get('sender_id')  # This should be derived from the authenticated user's session or token
+        # Check for required fields, including tracking_number
+        if not all([tracking_number, weight, length, width, height, value, pickup_location, drop_off_location, sender_id, recipient_id, courier_id, shipping_cost, distance]):
+            return jsonify({"error": "Missing required fields"}), 400
 
-        # Check if recipient exists by email
-        recipient = User.query.filter_by(email=data['recipient_email']).first()
-        if not recipient:
-            return jsonify({'error': 'Recipient not found'}), 404
+        # Validate that sender, recipient, and courier exist
+        sender = User.query.get(sender_id)
+        recipient = User.query.get(recipient_id)
+        courier = User.query.get(courier_id)
 
+        if not sender or not recipient or not courier:
+            return jsonify({"error": "Invalid sender, recipient, or courier ID"}), 404
+
+        # Create a new Parcel instance
+        new_parcel = Parcel(
+            tracking_number=tracking_number,
+            weight=weight,
+            length=length,
+            width=width,
+            height=height,
+            value=value,
+            pickup_location=pickup_location,
+            drop_off_location=drop_off_location,
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            courier_id=courier_id,
+            shipping_cost=shipping_cost,
+            distance=distance,
+        )
+
+        # Add the new parcel to the session and commit to the database
         try:
-            # Create a new Parcel object
-            parcel = Parcel(
-                weight=data['weight'],
-                length=data['length'],
-                width=data['width'],
-                height=data['height'],
-                value=data['value'],
-                pickup_location=data['pickup_location'],
-                drop_off_location=data['drop_off_location'],
-                sender_id=sender_id,
-                recipient_id=recipient.id,
-                courier_id=data.get('courier_id'),
-                shipping_cost=data['shipping_cost'],
-                distance=data['distance']
-            )
-
-            # Add the new parcel to the database
-            db.session.add(parcel)
+            db.session.add(new_parcel)
             db.session.commit()
-            
-            # Return the created parcel data
-            return jsonify(parcel.to_dict()), 201
+            return jsonify({"message": "Parcel created successfully", "parcel": new_parcel.to_dict()}), 201
         except Exception as e:
-            # Rollback if there's an error
             db.session.rollback()
-            return jsonify({'error': str(e)}), 400
+            return jsonify({"error": str(e)}), 500
+
 
 class ParcelTrackingResource(Resource):
     def get(self, tracking_number):
