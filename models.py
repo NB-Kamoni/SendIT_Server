@@ -186,3 +186,4 @@ class Parcel(db.Model, SerializerMixin):
          .join(courier_alias, Parcel.courier_id == courier_alias.id)
          
         return query.all()
+

@@ -169,8 +169,25 @@ class ClientParcelListResource(Resource):
 class CreateParcelResource(Resource):
     def post(self):
         """Client: Create a new parcel"""
-        data = request.json
+        data = request.get_json()
+        required_fields = ['weight', 'length', 'width', 'height', 'value', 'pickup_location', 'drop_off_location', 'recipient_email', 'shipping_cost', 'distance']
+
+        # Check for missing fields
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field} is required'}), 400
+
+        # Get the sender ID from the request context or token (assuming authenticated user)
+        # Replace this with your authentication method to retrieve the current user ID
+        sender_id = data.get('sender_id')  # This should be derived from the authenticated user's session or token
+
+        # Check if recipient exists by email
+        recipient = User.query.filter_by(email=data['recipient_email']).first()
+        if not recipient:
+            return jsonify({'error': 'Recipient not found'}), 404
+
         try:
+            # Create a new Parcel object
             parcel = Parcel(
                 weight=data['weight'],
                 length=data['length'],
@@ -179,18 +196,23 @@ class CreateParcelResource(Resource):
                 value=data['value'],
                 pickup_location=data['pickup_location'],
                 drop_off_location=data['drop_off_location'],
-                sender_id=data['sender_id'],
-                recipient_id=data['recipient_id'],
-                courier_id=data.get('courier_id'),  # Optional
+                sender_id=sender_id,
+                recipient_id=recipient.id,
+                courier_id=data.get('courier_id'),
                 shipping_cost=data['shipping_cost'],
                 distance=data['distance']
             )
+
+            # Add the new parcel to the database
             db.session.add(parcel)
             db.session.commit()
+            
+            # Return the created parcel data
             return jsonify(parcel.to_dict()), 201
         except Exception as e:
+            # Rollback if there's an error
             db.session.rollback()
-            abort(400, description=f"Error creating parcel: {str(e)}")
+            return jsonify({'error': str(e)}), 400
 
 class ParcelTrackingResource(Resource):
     def get(self, tracking_number):
@@ -232,3 +254,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
